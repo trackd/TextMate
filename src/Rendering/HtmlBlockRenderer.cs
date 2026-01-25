@@ -56,9 +56,9 @@ internal static class HtmlBlockRenderer {
     /// Creates a fallback HTML panel when syntax highlighting fails.
     /// </summary>
     private static Panel CreateFallbackHtmlPanel(List<string> htmlLines) {
-        string? htmlText = Markup.Escape(string.Join("\n", htmlLines));
-
-        return new Panel(new Markup(htmlText))
+        string htmlText = string.Join("\n", htmlLines);
+        var text = new Text(htmlText, Style.Plain);
+        return new Panel(text)
             .Border(BoxBorder.Rounded)
             .Header("html", Justify.Left);
     }

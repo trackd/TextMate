@@ -20,7 +20,8 @@ internal static class QuoteRenderer {
     public static IRenderable Render(QuoteBlock quote, Theme theme) {
         string quoteText = ExtractQuoteText(quote, theme);
 
-        return new Panel(new Markup(Markup.Escape(quoteText)))
+        var text = new Text(quoteText, Style.Plain);
+        return new Panel(text)
             .Border(BoxBorder.Heavy)
             .Header("quote", Justify.Left);
     }

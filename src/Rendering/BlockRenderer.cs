@@ -2,6 +2,7 @@ using Markdig.Extensions.Tables;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
 using PSTextMate.Utilities;
+using Spectre.Console;
 using Spectre.Console.Rendering;
 using TextMateSharp.Grammars;
 using TextMateSharp.Themes;
@@ -24,17 +25,19 @@ internal static class BlockRenderer {
     public static IEnumerable<IRenderable> RenderBlock(Block block, Theme theme, ThemeName themeName) {
         return block switch {
             // Special handling for paragraphs that contain only an image
-            ParagraphBlock paragraph when MarkdownPatterns.IsStandaloneImage(paragraph)
-                => RenderStandaloneImage(paragraph, theme) is IRenderable r ? new[] { r } : [],
+            // Return the image renderable followed by an explicit blank row so the image
+            // and the safety padding are separate renderables (not inside the same widget).
+            ParagraphBlock paragraph when MarkdownPatterns.IsStandaloneImage(paragraph) =>
+                RenderStandaloneImage(paragraph, theme) is IRenderable r ? new[] { r, Text.NewLine } : [],
 
             // Use renderers that build Spectre.Console objects directly
             HeadingBlock heading
                 => [HeadingRenderer.Render(heading, theme)],
             ParagraphBlock paragraph
-                => [ParagraphRenderer.Render(paragraph, theme)],
+                => ParagraphRenderer.Render(paragraph, theme),  // Returns IEnumerable<IRenderable>
             ListBlock list
                 => ListRenderer.Render(list, theme),
-            Table table
+            Markdig.Extensions.Tables.Table table
                 => TableRenderer.Render(table, theme) is IRenderable t ? [t] : [],
             FencedCodeBlock fencedCode
                 => CodeBlockRenderer.RenderFencedCodeBlock(fencedCode, theme, themeName) is IRenderable fc ? [fc] : [],

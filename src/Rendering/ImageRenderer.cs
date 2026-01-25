@@ -83,6 +83,8 @@ public static class ImageRenderer {
             int defaultMaxHeight = maxHeight ?? 30; // Default to ~30 lines high
 
             if (TryCreateSixelImage(localImagePath, defaultMaxWidth, defaultMaxHeight, out IRenderable? sixelImage) && sixelImage is not null) {
+                // Return the sixel image directly. The caller may append an explicit Text.NewLine
+                // so it renders as a separate row (avoids embedding the blank row inside the same widget).
                 return sixelImage;
             }
             else {
@@ -271,10 +273,10 @@ public static class ImageRenderer {
     /// <param name="altText">Alternative text for the image</param>
     /// <param name="imageUrl">URL or path to the image</param>
     /// <returns>A markup string representing the image as a link</returns>
-    private static Markup CreateImageFallback(string altText, string imageUrl) {
-        string? linkText = $"🖼️ Image: {altText.EscapeMarkup()}";
-        string? linkMarkup = $"[blue link={imageUrl.EscapeMarkup()}]{linkText}[/]";
-        return new Markup(linkMarkup);
+    private static Text CreateImageFallback(string altText, string imageUrl) {
+        string linkText = $"🖼️ Image: {altText}";
+        var style = new Style(Color.Blue, null, Decoration.Underline, imageUrl);
+        return new Text(linkText, style);
     }
 
     /// <summary>
@@ -289,10 +291,12 @@ public static class ImageRenderer {
             var fileInfo = new FileInfo(localPath);
             string? sizeText = fileInfo.Exists ? $" ({fileInfo.Length / 1024:N0} KB)" : "";
 
-            var content = new Markup($"🖼️ [blue link={imageUrl.EscapeMarkup()}]{altText.EscapeMarkup()}[/]{sizeText}");
-
-            return new Panel(content)
-                .Header("[grey]Image (Sixel not available)[/]")
+            // Build a text-based content with clickable link style
+            string display = $"🖼️ {altText}{sizeText}";
+            var linkStyle = new Style(Color.Blue, null, Decoration.Underline, imageUrl);
+            var text = new Text(display, linkStyle);
+            return new Panel(text)
+                .Header("Image (Sixel not available)")
                 .Border(BoxBorder.Rounded)
                 .BorderColor(Color.Grey);
         }
@@ -307,10 +311,10 @@ public static class ImageRenderer {
     /// <param name="altText">Alternative text for the image</param>
     /// <param name="imageUrl">URL or path to the image</param>
     /// <returns>A markup string representing the image as a link</returns>
-    private static Markup CreateImageFallbackInline(string altText, string imageUrl) {
-        string? linkText = $"🖼️ {altText.EscapeMarkup()}";
-        string? linkMarkup = $"[blue link={imageUrl.EscapeMarkup()}]{linkText}[/]";
-        return new Markup(linkMarkup);
+    private static Text CreateImageFallbackInline(string altText, string imageUrl) {
+        string display = $"🖼️ {altText}";
+        var style = new Style(Color.Blue, null, Decoration.Underline, imageUrl);
+        return new Text(display, style);
     }
 
     /// <summary>

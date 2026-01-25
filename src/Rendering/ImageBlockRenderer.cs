@@ -74,8 +74,9 @@ internal static class ImageBlockRenderer {
             return null;
         }
 
-        // Create a captioned text panel
-        Panel captionPanel = new Panel(new Markup(caption.EscapeMarkup()))
+        // Create a captioned text panel using Text to avoid markup parsing
+        var captionText = new Text(caption ?? string.Empty, Style.Plain);
+        Panel captionPanel = new Panel(captionText)
             .Border(BoxBorder.None)
             .Padding(0, 1);  // Padding on sides
 
@@ -99,13 +100,12 @@ internal static class ImageBlockRenderer {
         }
 
         // Create caption text
-        var captionText = new Markup(caption.EscapeMarkup());
+        var captionText2 = new Text(caption ?? string.Empty, Style.Plain);
 
         // Arrange vertically using Rows
-        // This is how you embed SixelImage (or any IRenderable) vertically
         return new Rows(
             imageRenderable,
-            new Padder(captionText, new Padding(0, 1))  // Padding above caption
+            new Padder(captionText2, new Padding(0, 1))  // Padding above caption
         );
     }
 
@@ -126,12 +126,12 @@ internal static class ImageBlockRenderer {
 
         Grid grid = new Grid()
             .AddColumn(new GridColumn { NoWrap = false })
-            .AddRow(new Markup(topCaption?.EscapeMarkup() ?? ""));
+            .AddRow(new Text(topCaption ?? string.Empty, Style.Plain));
 
         grid.AddRow(imageRenderable);
 
         if (!string.IsNullOrEmpty(bottomCaption)) {
-            grid.AddRow(new Markup(bottomCaption.EscapeMarkup()));
+            grid.AddRow(new Text(bottomCaption, Style.Plain));
         }
 
         return grid;
@@ -153,12 +153,12 @@ internal static class ImageBlockRenderer {
             .AddColumn("Caption");
 
         if (imageRenderable is not null) {
-            table.AddRow(imageRenderable, new Markup(caption.EscapeMarkup()));
+            table.AddRow(imageRenderable, new Text(caption ?? string.Empty, Style.Plain));
         }
         else {
             table.AddRow(
-                new Markup($"[grey]Image failed to load: {imageUrl}[/]"),
-                new Markup(caption.EscapeMarkup())
+                new Text($"Image failed to load: {imageUrl}", new Style(Color.Grey)),
+                new Text(caption ?? string.Empty, Style.Plain)
             );
         }
 

@@ -105,14 +105,42 @@ internal static class ListRenderer {
     }
 
     /// <summary>
-    /// Processes inline content and appends it directly to the paragraph with proper styling.
-    /// This method builds Text objects directly instead of markup strings.
+    /// Processes inline content and builds markup for list items.
     /// </summary>
     private static void AppendInlineContent(Paragraph paragraph, ContainerInline? inlines, Theme theme) {
         if (inlines is null) return;
 
-        // Skip LineBreakInline for list items; Rows handles separation between list entries
-        ParagraphRenderer.ProcessInlineElements(paragraph, inlines, theme, skipLineBreaks: true);
+        foreach (Inline inline in new List<Inline>(inlines)) {
+            switch (inline) {
+                case LiteralInline literal:
+                    string literalText = literal.Content.ToString();
+                    if (!string.IsNullOrEmpty(literalText)) {
+                        paragraph.Append(literalText, Style.Plain);
+                    }
+                    break;
+
+                case CodeInline code:
+                    paragraph.Append(code.Content, Style.Plain);
+                    break;
+
+                case LinkInline link when !link.IsImage:
+                    string linkText = ExtractInlineText(link);
+                    if (string.IsNullOrEmpty(linkText)) {
+                        linkText = link.Url ?? "";
+                    }
+                    var linkStyle = new Style(Color.Blue, null, Decoration.Underline, link.Url);
+                    paragraph.Append(linkText, linkStyle);
+                    break;
+
+                case LineBreakInline:
+                    // Skip line breaks in list items
+                    break;
+
+                default:
+                    paragraph.Append(ExtractInlineText(inline), Style.Plain);
+                    break;
+            }
+        }
     }
 
     /// <summary>

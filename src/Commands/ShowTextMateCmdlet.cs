@@ -24,7 +24,8 @@ public sealed class ShowTextMateCmdlet : PSCmdlet {
     [Parameter(
         Mandatory = true,
         ValueFromPipeline = true,
-        ValueFromPipelineByPropertyName = true
+        ValueFromPipelineByPropertyName = true,
+        Position = 0
     )]
     [AllowEmptyString]
     [AllowNull]
@@ -51,6 +52,13 @@ public sealed class ShowTextMateCmdlet : PSCmdlet {
     /// </summary>
     [Parameter]
     public SwitchParameter Stream { get; set; }
+
+    /// <summary>
+    /// When present, force use of the standard renderer even for Markdown grammars.
+    /// This can be used to preview alternate rendering behavior.
+    /// </summary>
+    [Parameter]
+    public SwitchParameter Alternate { get; set; }
 
     /// <summary>
     /// Number of lines to process per batch when streaming (default: 1000).
@@ -140,7 +148,7 @@ public sealed class ShowTextMateCmdlet : PSCmdlet {
         (string? token, bool asExtension) = TextMateResolver.ResolveToken(effectiveLanguage);
 
         // Process and wrap in HighlightedText
-        IRenderable[]? renderables = TextMateProcessor.ProcessLines(lines, Theme, token, isExtension: asExtension);
+        IRenderable[]? renderables = TextMateProcessor.ProcessLines(lines, Theme, token, isExtension: asExtension, forceAlternate: Alternate.IsPresent);
 
         return renderables is null
             ? null
@@ -167,12 +175,12 @@ public sealed class ShowTextMateCmdlet : PSCmdlet {
             ? TextMateResolver.ResolveToken(Language)
             : (filePath.Extension, true);
 
-        if (Stream.IsPresent) {
+            if (Stream.IsPresent) {
             // Streaming mode - yield HighlightedText objects directly from processor
             WriteVerbose($"Streaming file: {filePath.FullName} with {(asExtension ? "extension" : "language")}: {token}, batch size: {BatchSize}");
 
             // Direct passthrough - processor returns HighlightedText now
-            foreach (HighlightedText result in TextMateProcessor.ProcessFileInBatches(filePath.FullName, BatchSize, Theme, token, asExtension)) {
+                foreach (HighlightedText result in TextMateProcessor.ProcessFileInBatches(filePath.FullName, BatchSize, Theme, token, asExtension, Alternate.IsPresent)) {
                 yield return result;
             }
         }
@@ -181,7 +189,7 @@ public sealed class ShowTextMateCmdlet : PSCmdlet {
             WriteVerbose($"Processing file: {filePath.FullName} with {(asExtension ? "extension" : "language")}: {token}");
 
             string[] lines = File.ReadAllLines(filePath.FullName);
-            IRenderable[]? renderables = TextMateProcessor.ProcessLines(lines, Theme, token, isExtension: asExtension);
+            IRenderable[]? renderables = TextMateProcessor.ProcessLines(lines, Theme, token, isExtension: asExtension, forceAlternate: Alternate.IsPresent);
 
             if (renderables is not null) {
                 yield return new HighlightedText {

@@ -24,7 +24,7 @@ public static class TextMateProcessor {
     /// <returns>Rendered rows with syntax highlighting, or null if processing fails</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="lines"/> is null</exception>
     /// <exception cref="InvalidOperationException">Thrown when grammar cannot be found or processing encounters an error</exception>
-    public static IRenderable[]? ProcessLines(string[] lines, ThemeName themeName, string grammarId, bool isExtension) {
+    public static IRenderable[]? ProcessLines(string[] lines, ThemeName themeName, string grammarId, bool isExtension, bool forceAlternate = false) {
         ArgumentNullException.ThrowIfNull(lines, nameof(lines));
 
         if (lines.Length == 0 || lines.AllIsNullOrEmpty()) {
@@ -36,8 +36,12 @@ public static class TextMateProcessor {
             // Resolve grammar using CacheManager which knows how to map language ids and extensions
             IGrammar? grammar = CacheManager.GetCachedGrammar(registry, grammarId, isExtension) ?? throw new InvalidOperationException(isExtension ? $"Grammar not found for file extension: {grammarId}" : $"Grammar not found for language: {grammarId}");
 
-            // Use optimized rendering based on grammar type
-            return grammar.GetName() == "Markdown"
+            // if alternate it will use TextMate for markdown as well.
+            if (grammar.GetName() == "Markdown" && forceAlternate) {
+                return StandardRenderer.Render(lines, theme, grammar);
+            }
+
+            return (grammar.GetName() == "Markdown")
                 ? MarkdownRenderer.Render(lines, theme, grammar, themeName)
                 : StandardRenderer.Render(lines, theme, grammar);
         }
@@ -147,6 +151,8 @@ public static class TextMateProcessor {
         ThemeName themeName,
         string grammarId,
         bool isExtension = false,
+        bool forceAlternate = false,
+        bool useMarkdownLayout = false,
         IProgress<(int batchIndex, long linesProcessed)>? progress = null,
         CancellationToken cancellationToken = default) {
         ArgumentNullException.ThrowIfNull(lines, nameof(lines));
@@ -163,7 +169,11 @@ public static class TextMateProcessor {
         (TextMateSharp.Registry.Registry registry, Theme theme) = CacheManager.GetCachedTheme(themeName);
         // Resolve grammar using CacheManager which knows how to map language ids and extensions
         IGrammar? grammar = CacheManager.GetCachedGrammar(registry, grammarId, isExtension) ?? throw new InvalidOperationException(isExtension ? $"Grammar not found for file extension: {grammarId}" : $"Grammar not found for language: {grammarId}");
-        bool useMarkdownRenderer = grammar.GetName() == "Markdown";
+        bool useMarkdownRenderer = grammar.GetName() == "Markdown" && !forceAlternate;
+        // If explicitly requested, prefer the Markdown layout even when forceAlternate is used
+        if (grammar.GetName() == "Markdown" && useMarkdownLayout) {
+            useMarkdownRenderer = true;
+        }
 
         foreach (string? line in lines) {
             cancellationToken.ThrowIfCancellationRequested();
@@ -211,7 +221,7 @@ public static class TextMateProcessor {
     /// <summary>
     /// Backward compatibility overload without cancellation and progress support.
     /// </summary>
-    public static IEnumerable<HighlightedText> ProcessLinesInBatches(IEnumerable<string> lines, int batchSize, ThemeName themeName, string grammarId, bool isExtension = false) => ProcessLinesInBatches(lines, batchSize, themeName, grammarId, isExtension, null, CancellationToken.None);
+    public static IEnumerable<HighlightedText> ProcessLinesInBatches(IEnumerable<string> lines, int batchSize, ThemeName themeName, string grammarId, bool isExtension = false) => ProcessLinesInBatches(lines, batchSize, themeName, grammarId, isExtension, false, false, null, CancellationToken.None);
 
     /// <summary>
     /// Helper to stream a file by reading lines lazily and processing them in batches.
@@ -235,15 +245,17 @@ public static class TextMateProcessor {
         ThemeName themeName,
         string grammarId,
         bool isExtension = false,
+        bool forceAlternate = false,
+        bool useMarkdownLayout = false,
         IProgress<(int batchIndex, long linesProcessed)>? progress = null,
         CancellationToken cancellationToken = default) {
         return !File.Exists(filePath)
             ? throw new FileNotFoundException(filePath)
-            : ProcessLinesInBatches(File.ReadLines(filePath), batchSize, themeName, grammarId, isExtension, progress, cancellationToken);
+            : ProcessLinesInBatches(File.ReadLines(filePath), batchSize, themeName, grammarId, isExtension, forceAlternate, useMarkdownLayout, progress, cancellationToken);
     }
 
     /// <summary>
     /// Backward compatibility overload without cancellation and progress support.
     /// </summary>
-    public static IEnumerable<HighlightedText> ProcessFileInBatches(string filePath, int batchSize, ThemeName themeName, string grammarId, bool isExtension = false) => ProcessFileInBatches(filePath, batchSize, themeName, grammarId, isExtension, null, CancellationToken.None);
+    public static IEnumerable<HighlightedText> ProcessFileInBatches(string filePath, int batchSize, ThemeName themeName, string grammarId, bool isExtension = false) => ProcessFileInBatches(filePath, batchSize, themeName, grammarId, isExtension, false, false, null, CancellationToken.None);
 }

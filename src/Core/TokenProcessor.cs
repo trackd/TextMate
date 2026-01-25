@@ -187,6 +187,35 @@ internal static class TokenProcessor {
     }
 
     /// <summary>
+    /// Processes tokens and appends their text into the provided Paragraph using Spectre styles.
+    /// This avoids building markup strings and lets Spectre handle rendering directly.
+    /// </summary>
+    public static void ProcessTokensToParagraph(
+        IToken[] tokens,
+        string line,
+        Theme theme,
+        Paragraph paragraph,
+        bool escapeMarkup = true) {
+
+        foreach (IToken token in tokens) {
+            int startIndex = Math.Min(token.StartIndex, line.Length);
+            int endIndex = Math.Min(token.EndIndex, line.Length);
+            if (startIndex >= endIndex) continue;
+
+            string text = line[startIndex..endIndex];
+            Style? style = GetStyleForScopes(token.Scopes, theme);
+
+            // Paragraph.Append does not interpret Spectre markup, so no escaping is necessary.
+            if (style is not null) {
+                paragraph.Append(text, style);
+            }
+            else {
+                paragraph.Append(text, Style.Plain);
+            }
+        }
+    }
+
+    /// <summary>
     /// Returns a cached Style for the given scopes and theme. Returns null for default/no-style.
     /// </summary>
     public static Style? GetStyleForScopes(IEnumerable<string> scopes, Theme theme) {

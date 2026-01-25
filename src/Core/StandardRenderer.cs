@@ -23,7 +23,6 @@ internal static class StandardRenderer {
     // public static IRenderable[] Render(string[] lines, Theme theme, IGrammar grammar) => Render(lines, theme, grammar);
 
     public static IRenderable[] Render(string[] lines, Theme theme, IGrammar grammar) {
-        StringBuilder builder = StringBuilderPool.Rent();
         List<IRenderable> rows = new(lines.Length);
 
         try {
@@ -32,10 +31,15 @@ internal static class StandardRenderer {
                 string line = lines[lineIndex];
                 ITokenizeLineResult result = grammar.TokenizeLine(line, ruleStack, TimeSpan.MaxValue);
                 ruleStack = result.RuleStack;
-                TokenProcessor.ProcessTokensBatch(result.Tokens, line, theme, builder, lineIndex);
-                string? lineMarkup = builder.ToString();
-                rows.Add(string.IsNullOrEmpty(lineMarkup) ? Text.Empty : new Markup(lineMarkup));
-                builder.Clear();
+
+                if (string.IsNullOrEmpty(line)) {
+                    rows.Add(Text.Empty);
+                    continue;
+                }
+
+                var paragraph = new Paragraph();
+                TokenProcessor.ProcessTokensToParagraph(result.Tokens, line, theme, paragraph);
+                rows.Add(paragraph);
             }
 
             return [.. rows];
@@ -45,9 +49,6 @@ internal static class StandardRenderer {
         }
         catch (Exception ex) {
             throw new InvalidOperationException($"Unexpected error during rendering: {ex.Message}", ex);
-        }
-        finally {
-            StringBuilderPool.Return(builder);
         }
     }
 }
