@@ -13,8 +13,8 @@
 
   <ItemGroup>
     <PackageReference Include="Markdig.Signed" Version="0.38.0" PrivateAssets="all" />
-    <PackageReference Include="Spectre.Console" Version="0.51.*" PrivateAssets="all" />
-    <PackageReference Include="TextMateSharp" Version="*" />
+    <PackageReference Include="Spectre.Console" Version="0.54.*" PrivateAssets="all" />
+    <PackageReference Include="TextMateSharp" Version="2.0.2" />
     <PackageReference Include="TextMateSharp.Grammars" Version="2.0.*" />
     <PackageReference Include="Onigwrap" Version="1.0.*" />
     <PackageReference Include="System.Management.Automation" Version="7.4" PrivateAssets="all" />

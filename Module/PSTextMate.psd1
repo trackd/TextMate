@@ -7,14 +7,14 @@
     Copyright            = '(c) trackd. All rights reserved.'
     PowerShellVersion    = '7.4'
     CompatiblePSEditions = 'Core'
-    CmdletsToExport      = 'Show-TextMate', 'Test-SupportedTextMate', 'Get-SupportedTextMate', 'Debug-TextMate', 'Debug-TextMateTokens','Debug-SixelSupport','Test-ImageRendering'
+    CmdletsToExport      = 'Show-TextMate', 'Test-SupportedTextMate', 'Get-SupportedTextMate'
     AliasesToExport      = '*'
     RequiredAssemblies   = './lib/TextMateSharp.dll', './lib/TextMateSharp.Grammars.dll', './lib/Onigwrap.dll', 'Markdig.Signed.dll'
     FormatsToProcess     = 'PSTextMate.format.ps1xml'
     RequiredModules      = @(
         @{
             ModuleName     = 'PwshSpectreConsole'
-            ModuleVersion  = '2.1.0'
+            ModuleVersion  = '2.3.0'
             MaximumVersion = '2.9.9'
         }
     )

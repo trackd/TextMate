@@ -13,9 +13,6 @@ namespace PSTextMate.Core;
 /// Handles theme property extraction and token rendering with performance optimizations.
 /// </summary>
 internal static class TokenProcessor {
-    // Toggle caching via environment variable PSTEXTMATE_DISABLE_STYLECACHE=1 to disable
-    public static readonly bool EnableStyleCache = Environment.GetEnvironmentVariable("PSTEXTMATE_DISABLE_STYLECACHE") != "1";
-    // Cache theme extraction results per (scopesKey, themeInstanceHash)
     private static readonly ConcurrentDictionary<(string scopesKey, int themeHash), (int fg, int bg, FontStyle fs)> _themePropertyCache = new();
     // Cache Style results per (scopesKey, themeInstanceHash)
     private static readonly ConcurrentDictionary<(string scopesKey, int themeHash), Style?> _styleCache = new();
@@ -44,7 +41,7 @@ internal static class TokenProcessor {
 
             if (startIndex >= endIndex) continue;
 
-            ReadOnlySpan<char> textSpan = line.SubstringAsSpan(startIndex, endIndex);
+            ReadOnlySpan<char> textSpan = line.SpanSubstring(startIndex, endIndex);
 
             // Use cached Style where possible to avoid rebuilding Style objects per token
             Style? style = GetStyleForScopes(token.Scopes, theme);
@@ -53,7 +50,7 @@ internal static class TokenProcessor {
             (int foreground, int background, FontStyle fontStyle) = (-1, -1, FontStyle.NotSet);
 
             // Use the returning API so callers can append with style consistently (prevents markup regressions)
-            (string processedText, Style? resolvedStyle) = WriteTokenOptimizedReturn(textSpan, style, theme, escapeMarkup);
+            (string processedText, Style? resolvedStyle) = WriteTokenReturn(textSpan, style, theme, escapeMarkup);
             builder.AppendWithStyle(resolvedStyle, processedText);
 
         }
@@ -94,7 +91,7 @@ internal static class TokenProcessor {
     /// where the caller appends via AppendWithStyle so that Markup escaping and concatenation
     /// semantics remain identical.
     /// </summary>
-    public static (string processedText, Style? style) WriteTokenOptimizedReturn(
+    public static (string processedText, Style? style) WriteTokenReturn(
         ReadOnlySpan<char> text,
         Style? styleHint,
         Theme theme,
@@ -121,7 +118,7 @@ internal static class TokenProcessor {
     /// Append the provided text span into the builder with optional style and optional markup escaping.
     /// (Existing fast-path writer retained for specialized callers.)
     /// </summary>
-    public static void WriteTokenOptimized(
+    public static void WriteToken(
         StringBuilder builder,
         ReadOnlySpan<char> text,
         Style? style,

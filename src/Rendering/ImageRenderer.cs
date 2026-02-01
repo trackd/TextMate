@@ -166,7 +166,7 @@ public static class ImageRenderer {
             // First, try the direct approach - SixelImage is in Spectre.Console namespace
             // but might be in different assemblies (Spectre.Console vs Spectre.Console.ImageSharp)
             Type? sixelImageType = Type.GetType("Spectre.Console.SixelImage, Spectre.Console.ImageSharp")
-                            ?? Type.GetType("Spectre.Console.SixelImage, Spectre.Console");
+                            ?? Type.GetType("Spectre.Console.SixelImage, Spectre.Console") ?? Type.GetType("PwshSpectreConsole.PixelImage, PwshSpectreConsole");
 
             // If that fails, search through loaded assemblies
             if (sixelImageType is null) {

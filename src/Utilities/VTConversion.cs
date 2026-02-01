@@ -2,7 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using Spectre.Console;
 
-namespace PSTextMate.Core.Helpers;
+namespace PSTextMate.Helpers;
 
 /// <summary>
 /// Efficient parser for VT (Virtual Terminal) escape sequences that converts them to Spectre.Console objects.

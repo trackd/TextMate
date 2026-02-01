@@ -221,7 +221,8 @@ public static class TextMateProcessor {
     /// <summary>
     /// Backward compatibility overload without cancellation and progress support.
     /// </summary>
-    public static IEnumerable<HighlightedText> ProcessLinesInBatches(IEnumerable<string> lines, int batchSize, ThemeName themeName, string grammarId, bool isExtension = false) => ProcessLinesInBatches(lines, batchSize, themeName, grammarId, isExtension, false, false, null, CancellationToken.None);
+    public static IEnumerable<HighlightedText> ProcessLinesInBatches(IEnumerable<string> lines, int batchSize, ThemeName themeName, string grammarId, bool isExtension = false)
+        => ProcessLinesInBatches(lines, batchSize, themeName, grammarId, isExtension, false, false, null, CancellationToken.None);
 
     /// <summary>
     /// Helper to stream a file by reading lines lazily and processing them in batches.
