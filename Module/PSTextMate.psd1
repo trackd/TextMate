@@ -1,5 +1,5 @@
 @{
-    RootModule           = 'lib/PSTextMate.dll'
+    RootModule           = 'PSTextMate.dll'
     ModuleVersion        = '0.1.0'
     GUID                 = 'a6490f8a-1f53-44f2-899c-bf66b9c6e608'
     Author               = 'trackd'
@@ -23,9 +23,9 @@
         'Show-Code'
     )
     RequiredAssemblies   = @(
-        './lib/TextMateSharp.dll'
-        './lib/TextMateSharp.Grammars.dll'
-        './lib/Onigwrap.dll'
+        'lib/Onigwrap.dll'
+        'lib/TextMateSharp.dll'
+        'lib/TextMateSharp.Grammars.dll'
         'Markdig.Signed.dll'
     )
     FormatsToProcess     = 'PSTextMate.format.ps1xml'
@@ -33,7 +33,7 @@
         @{
             ModuleName     = 'PwshSpectreConsole'
             ModuleVersion  = '2.3.0'
-            MaximumVersion = '2.9.9'
+            MaximumVersion = '2.99.99'
         }
     )
 }

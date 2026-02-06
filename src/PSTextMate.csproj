@@ -7,7 +7,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <LangVersion>13.0</LangVersion>
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-        <RuntimeIdentifiers>win-x64;linux-x64;osx-arm64</RuntimeIdentifiers>
+        <!-- <RuntimeIdentifiers>win-x64;linux-x64;osx-arm64</RuntimeIdentifiers> -->
         <!-- <GenerateDocumentationFile>true</GenerateDocumentationFile> -->
     </PropertyGroup>
     <PropertyGroup>
@@ -37,4 +37,17 @@
         <!-- https://learn.microsoft.com/en-us/nuget/concepts/auditing-packages#excluding-advisories -->
         <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-447r-wph3-92pm" />
     </ItemGroup>
+
+        <!-- After publish, copy native runtime libraries directly into PublishDir (simple layout) -->
+        <!-- <Target Name="FlattenNativeRuntimes" AfterTargets="Publish">
+            <ItemGroup>
+                <NativeRuntimeFiles Include="$(PublishDir)runtimes\**\native\*.*" />
+            </ItemGroup>
+            <Message Text="Copying native runtime files to $(PublishDir)" Importance="Normal" Condition=" '@(NativeRuntimeFiles)' != '' "/>
+            <MakeDir Directories="$(PublishDir)" Condition="!Exists('$(PublishDir)')" />
+            <Copy SourceFiles="@(NativeRuntimeFiles)"
+                    DestinationFiles="@(NativeRuntimeFiles->'$(PublishDir)%(Filename)%(Extension)')"
+                    SkipUnchangedFiles="true"
+                    Condition=" '@(NativeRuntimeFiles)' != '' " />
+        </Target> -->
 </Project>

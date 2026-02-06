@@ -12,6 +12,7 @@ $modulename = [System.IO.Path]::GetFileName($PSCommandPath) -replace '\.build\.p
 $script:folders = @{
     ModuleName       = $modulename
     ProjectRoot      = $PSScriptRoot
+    TempLib          = Join-Path $PSScriptRoot 'templib'
     SourcePath       = Join-Path $PSScriptRoot 'src'
     OutputPath       = Join-Path $PSScriptRoot 'output'
     DestinationPath  = Join-Path $PSScriptRoot 'output' 'lib'
@@ -35,9 +36,21 @@ task Build {
     }
     try {
         Push-Location $folders.SourcePath
-        $buildOutput = dotnet publish $folders.CsprojPath --configuration $Configuration --nologo --verbosity minimal --output $folders.DestinationPath 2>&1
+
+        # exec { dotnet publish $folders.CsprojPath --configuration $Configuration --nologo --verbosity minimal --output $folders.DestinationPath }
+        exec { dotnet publish $folders.CsprojPath --configuration $Configuration --nologo --verbosity minimal --output $folders.TempLib }
         if ($LASTEXITCODE -ne 0) {
-            throw "Build failed:`n$buildOutput"
+            throw "Build failed with exit code $LASTEXITCODE"
+        }
+        New-Item -Path $folders.outputPath -ItemType Directory -Force | Out-Null
+        New-Item -Path $folders.DestinationPath -ItemType Directory -Force | Out-Null
+        Get-ChildItem -Path (Join-Path $folders.TempLib 'runtimes' 'win-x64' 'native') -Filter *.dll | Move-Item -Destination $folders.DestinationPath -Force
+        Get-ChildItem -Path (Join-Path $folders.TempLib 'runtimes' 'osx-arm64' 'native') -Filter *.dylib | Move-Item -Destination $folders.DestinationPath -Force
+        Get-ChildItem -Path (Join-Path $folders.TempLib 'runtimes' 'linux-x64' 'native') -Filter *.so | Copy-Item -Destination $folders.DestinationPath -Force
+        Move-Item (Join-Path $folders.TempLib 'PSTextMate.dll') -Destination $folders.OutputPath -Force
+        Get-ChildItem "$($folders.TempLib)/*.dll" | Move-Item -Destination $folders.DestinationPath -Force
+        if (Test-Path -Path $folders.TempLib -PathType Container) {
+            Remove-Item -Path $folders.TempLib -Recurse -Force -ErrorAction 'Ignore'
         }
     }
     finally {
@@ -98,6 +111,12 @@ task Test -if (-not $SkipTests) {
         Write-Warning "Test directory not found at: $($folders.TestPath)"
         return
     }
+    $ParentPath = Split-Path $folders.ProjectRoot -Parent
+    Import-Module (Join-Path $ParentPath 'PwshSpectreConsole' 'output' 'PwshSpectreConsole.psd1')
+
+    Import-Module (Join-Path $folders.OutputPath 'PSTextMate.psd1') -ErrorAction Stop
+    Import-Module (Join-Path $folders.TestPath 'testhelper.psm1') -ErrorAction Stop
+
     $pesterConfig = New-PesterConfiguration
     # $pesterConfig.Output.Verbosity = 'Detailed'
     $pesterConfig.Run.Path = $folders.TestPath
@@ -112,5 +131,5 @@ task CleanAfter {
 }
 
 
-task All -Jobs Clean, Build, ModuleFiles, GenerateHelp, CleanAfter #, Test
+task All -Jobs Clean, Build, ModuleFiles, GenerateHelp, CleanAfter , Test
 task BuildAndTest -Jobs Clean, Build, ModuleFiles, CleanAfter #, Test
