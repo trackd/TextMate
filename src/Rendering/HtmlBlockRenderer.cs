@@ -1,9 +1,9 @@
 using Markdig.Syntax;
+using PSTextMate.Core;
 using Spectre.Console;
 using Spectre.Console.Rendering;
 using TextMateSharp.Grammars;
 using TextMateSharp.Themes;
-using PSTextMate.Core;
 
 namespace PSTextMate.Rendering;
 

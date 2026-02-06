@@ -1,6 +1,6 @@
 using System.Text;
-using PSTextMate.Utilities;
 using PSTextMate.Core;
+using PSTextMate.Utilities;
 using Spectre.Console;
 using Spectre.Console.Rendering;
 using TextMateSharp.Grammars;
@@ -37,11 +37,9 @@ public static class TextMateProcessor {
             IGrammar? grammar = CacheManager.GetCachedGrammar(registry, grammarId, isExtension) ?? throw new InvalidOperationException(isExtension ? $"Grammar not found for file extension: {grammarId}" : $"Grammar not found for language: {grammarId}");
 
             // if alternate it will use TextMate for markdown as well.
-            if (grammar.GetName() == "Markdown" && forceAlternate) {
-                return StandardRenderer.Render(lines, theme, grammar);
-            }
-
-            return (grammar.GetName() == "Markdown")
+            return grammar.GetName() == "Markdown" && forceAlternate
+                ? StandardRenderer.Render(lines, theme, grammar)
+                : (grammar.GetName() == "Markdown")
                 ? MarkdownRenderer.Render(lines, theme, grammar, themeName)
                 : StandardRenderer.Render(lines, theme, grammar);
         }

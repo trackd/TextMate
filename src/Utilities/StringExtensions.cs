@@ -6,8 +6,7 @@ namespace PSTextMate.Utilities;
 /// Provides optimized string manipulation methods using modern .NET performance patterns.
 /// Uses Span and ReadOnlySpan to minimize memory allocations during text processing.
 /// </summary>
-public static class StringExtensions
-{
+public static class StringExtensions {
     /// <summary>
     /// Efficiently extracts substring using Span to avoid string allocations.
     /// This is significantly faster than traditional substring operations for large text processing.
@@ -16,8 +15,7 @@ public static class StringExtensions
     /// <param name="startIndex">Starting index for substring</param>
     /// <param name="endIndex">Ending index for substring</param>
     /// <returns>ReadOnlySpan representing the substring</returns>
-    public static ReadOnlySpan<char> SpanSubstring(this string source, int startIndex, int endIndex)
-    {
+    public static ReadOnlySpan<char> SpanSubstring(this string source, int startIndex, int endIndex) {
         return startIndex < 0 || endIndex > source.Length || startIndex > endIndex
             ? []
             : source.AsSpan(startIndex, endIndex - startIndex);
@@ -31,8 +29,7 @@ public static class StringExtensions
     /// <param name="startIndex">Starting index for substring</param>
     /// <param name="endIndex">Ending index for substring</param>
     /// <returns>Substring as string, or empty string if invalid indexes</returns>
-    public static string SubstringAtIndexes(this string source, int startIndex, int endIndex)
-    {
+    public static string SubstringAtIndexes(this string source, int startIndex, int endIndex) {
         ReadOnlySpan<char> span = source.SpanSubstring(startIndex, endIndex);
         return span.IsEmpty ? string.Empty : span.ToString();
     }
@@ -53,8 +50,7 @@ public static class StringExtensions
     /// <param name="values">Array of strings to join</param>
     /// <param name="separator">Separator character</param>
     /// <returns>Joined string</returns>
-    public static string SpanJoin(this string[] values, char separator)
-    {
+    public static string SpanJoin(this string[] values, char separator) {
         if (values.Length == 0) return string.Empty;
         if (values.Length == 1) return values[0] ?? string.Empty;
 
@@ -65,8 +61,7 @@ public static class StringExtensions
 
         var builder = new StringBuilder(totalLength);
 
-        for (int i = 0; i < values.Length; i++)
-        {
+        for (int i = 0; i < values.Length; i++) {
             if (i > 0) builder.Append(separator);
             if (values[i] is not null)
                 builder.Append(values[i].AsSpan());
@@ -84,8 +79,7 @@ public static class StringExtensions
     /// <param name="options">String split options</param>
     /// <param name="maxSplits">Maximum expected number of splits for optimization</param>
     /// <returns>Array of split strings</returns>
-    public static string[] SpanSplit(this string source, char[] separators, StringSplitOptions options = StringSplitOptions.None, int maxSplits = 16)
-    {
+    public static string[] SpanSplit(this string source, char[] separators, StringSplitOptions options = StringSplitOptions.None, int maxSplits = 16) {
         if (string.IsNullOrEmpty(source))
             return [];
 
@@ -94,17 +88,14 @@ public static class StringExtensions
         var results = new List<string>(Math.Min(maxSplits, 64)); // Cap initial capacity
 
         int start = 0;
-        for (int i = 0; i <= sourceSpan.Length; i++)
-        {
+        for (int i = 0; i <= sourceSpan.Length; i++) {
             bool isSeparator = i < sourceSpan.Length && separators.Contains(sourceSpan[i]);
             bool isEnd = i == sourceSpan.Length;
 
-            if (isSeparator || isEnd)
-            {
+            if (isSeparator || isEnd) {
                 ReadOnlySpan<char> segment = sourceSpan[start..i];
 
-                if (options.HasFlag(StringSplitOptions.RemoveEmptyEntries) && segment.IsEmpty)
-                {
+                if (options.HasFlag(StringSplitOptions.RemoveEmptyEntries) && segment.IsEmpty) {
                     start = i + 1;
                     continue;
                 }
@@ -126,8 +117,7 @@ public static class StringExtensions
     /// </summary>
     /// <param name="source">Source string to trim</param>
     /// <returns>Trimmed string</returns>
-    public static string SpanTrim(this string source)
-    {
+    public static string SpanTrim(this string source) {
         if (string.IsNullOrEmpty(source))
             return source ?? string.Empty;
 
@@ -151,8 +141,7 @@ public static class StringExtensions
     /// <param name="oldChar">Character to replace</param>
     /// <param name="newChar">Replacement character</param>
     /// <returns>String with replacements</returns>
-    public static string SpanReplace(this string source, char oldChar, char newChar)
-    {
+    public static string SpanReplace(this string source, char oldChar, char newChar) {
         if (string.IsNullOrEmpty(source))
             return source ?? string.Empty;
 
@@ -166,8 +155,7 @@ public static class StringExtensions
         var result = new StringBuilder(source.Length);
         int lastIndex = 0;
 
-        do
-        {
+        do {
             result.Append(sourceSpan[lastIndex..firstIndex]);
             result.Append(newChar);
             lastIndex = firstIndex + 1;

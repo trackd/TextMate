@@ -1,5 +1,5 @@
-﻿using Markdig.Syntax.Inlines;
-using System.Text;
+﻿using System.Text;
+using Markdig.Syntax.Inlines;
 
 namespace PSTextMate.Utilities;
 

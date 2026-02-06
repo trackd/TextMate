@@ -48,27 +48,12 @@ public sealed class ShowTextMateCmdlet : PSCmdlet {
     public ThemeName Theme { get; set; } = ThemeName.DarkPlus;
 
     /// <summary>
-    /// Enables streaming mode for large files, processing in batches.
-    /// </summary>
-    [Parameter]
-    public SwitchParameter Stream { get; set; }
-
-    /// <summary>
     /// When present, force use of the standard renderer even for Markdown grammars.
     /// This can be used to preview alternate rendering behavior.
     /// </summary>
     [Parameter]
     public SwitchParameter Alternate { get; set; }
 
-    /// <summary>
-    /// Number of lines to process per batch when streaming (default: 1000).
-    /// </summary>
-    [Parameter]
-    public int BatchSize { get; set; } = 1000;
-
-    /// <summary>
-    /// Processes each input record from the pipeline.
-    /// </summary>
     protected override void ProcessRecord() {
         if (MyInvocation.ExpectingInput) {
             if (InputObject?.BaseObject is FileInfo file) {
@@ -131,7 +116,7 @@ public sealed class ShowTextMateCmdlet : PSCmdlet {
 
     private HighlightedText? ProcessStringInput() {
         // Normalize buffered strings into lines
-        string[] lines = NormalizeToLines(_inputObjectBuffer);
+        string[] lines = TextMateHelper.NormalizeToLines(_inputObjectBuffer);
 
         if (lines.AllIsNullOrEmpty()) {
             WriteVerbose("All input strings are null or empty");
@@ -175,64 +160,28 @@ public sealed class ShowTextMateCmdlet : PSCmdlet {
             ? TextMateResolver.ResolveToken(Language)
             : (filePath.Extension, true);
 
-            if (Stream.IsPresent) {
-            // Streaming mode - yield HighlightedText objects directly from processor
-            WriteVerbose($"Streaming file: {filePath.FullName} with {(asExtension ? "extension" : "language")}: {token}, batch size: {BatchSize}");
+        // Single file processing
+        WriteVerbose($"Processing file: {filePath.FullName} with {(asExtension ? "extension" : "language")}: {token}");
 
-            // Direct passthrough - processor returns HighlightedText now
-                foreach (HighlightedText result in TextMateProcessor.ProcessFileInBatches(filePath.FullName, BatchSize, Theme, token, asExtension, Alternate.IsPresent)) {
-                yield return result;
-            }
-        }
-        else {
-            // Single file processing
-            WriteVerbose($"Processing file: {filePath.FullName} with {(asExtension ? "extension" : "language")}: {token}");
+        string[] lines = File.ReadAllLines(filePath.FullName);
+        IRenderable[]? renderables = TextMateProcessor.ProcessLines(lines, Theme, token, isExtension: asExtension, forceAlternate: Alternate.IsPresent);
 
-            string[] lines = File.ReadAllLines(filePath.FullName);
-            IRenderable[]? renderables = TextMateProcessor.ProcessLines(lines, Theme, token, isExtension: asExtension, forceAlternate: Alternate.IsPresent);
-
-            if (renderables is not null) {
-                yield return new HighlightedText {
-                    Renderables = renderables
-                };
-            }
+        if (renderables is not null) {
+            yield return new HighlightedText {
+                Renderables = renderables
+            };
         }
     }
 
-    private static string[] NormalizeToLines(List<string> buffer) {
-
-        if (buffer.Count == 0) {
-            return [];
-        }
-
-        // Multiple strings in buffer - treat each as a line
-        if (buffer.Count > 1) {
-            return [.. buffer];
-        }
-
-        // Single string - check if it contains newlines
-        string? single = buffer[0];
-        if (string.IsNullOrEmpty(single)) {
-            return single is not null ? [single] : [];
-        }
-
-        // Split on newlines if present
-        if (single.Contains('\n') || single.Contains('\r')) {
-            return single.Split(["\r\n", "\n", "\r"], StringSplitOptions.None);
-        }
-
-        // Single string with no newlines
-        return [single];
-    }
     private void GetSourceHint() {
         if (InputObject is null) return;
-
         string? hint = InputObject.Properties["PSPath"]?.Value as string
-                        ?? InputObject.Properties["FullName"]?.Value as string;
+                        ?? InputObject.Properties["FullName"]?.Value as string
+                        ?? InputObject.Properties["PSChildName"]?.Value as string;
         if (string.IsNullOrEmpty(hint)) return;
 
-        // remove potential Provider stuff from string.
-        hint = GetUnresolvedProviderPathFromPSPath(hint);
+        WriteVerbose($"Language Hint: {hint}");
+
         if (_sourceExtensionHint is null) {
             string ext = Path.GetExtension(hint);
             if (!string.IsNullOrWhiteSpace(ext)) {
@@ -240,7 +189,8 @@ public sealed class ShowTextMateCmdlet : PSCmdlet {
                 WriteVerbose($"Detected extension hint from PSPath: {ext}");
             }
         }
-
+        // remove potential Provider stuff from string.
+        hint = GetUnresolvedProviderPathFromPSPath(hint);
         if (_sourceBaseDirectory is null) {
             string? baseDir = Path.GetDirectoryName(hint);
             if (!string.IsNullOrWhiteSpace(baseDir)) {

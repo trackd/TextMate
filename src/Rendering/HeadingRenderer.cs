@@ -1,11 +1,11 @@
+using System.Text;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
+using PSTextMate.Core;
+using PSTextMate.Utilities;
 using Spectre.Console;
 using Spectre.Console.Rendering;
-using System.Text;
 using TextMateSharp.Themes;
-using PSTextMate.Utilities;
-using PSTextMate.Core;
 
 namespace PSTextMate.Rendering;
 
