@@ -54,12 +54,23 @@ public sealed class ShowTextMateCmdlet : PSCmdlet {
     [Parameter]
     public SwitchParameter Alternate { get; set; }
 
+    /// <summary>
+    /// When present, output a single HighlightedText container instead of enumerating renderables.
+    /// </summary>
+    [Parameter]
+    public SwitchParameter Lines { get; set; }
+
     protected override void ProcessRecord() {
         if (MyInvocation.ExpectingInput) {
             if (InputObject?.BaseObject is FileInfo file) {
                 try {
                     foreach (HighlightedText result in ProcessPathInput(file)) {
-                        WriteObject(result.Renderables, enumerateCollection: true);
+                        if (Lines.IsPresent) {
+                            WriteObject(result.Renderables, enumerateCollection: true);
+                        }
+                        else {
+                            WriteObject(result);
+                        }
                     }
                 }
                 catch (Exception ex) {
@@ -81,7 +92,12 @@ public sealed class ShowTextMateCmdlet : PSCmdlet {
             if (!file.Exists) return;
             try {
                 foreach (HighlightedText result in ProcessPathInput(file)) {
-                    WriteObject(result.Renderables, enumerateCollection: true);
+                    if (Lines.IsPresent) {
+                        WriteObject(result.Renderables, enumerateCollection: true);
+                    }
+                    else {
+                        WriteObject(result);
+                    }
                 }
             }
             catch (Exception ex) {
@@ -105,8 +121,12 @@ public sealed class ShowTextMateCmdlet : PSCmdlet {
             }
             HighlightedText? result = ProcessStringInput();
             if (result is not null) {
-                // Output each renderable directly so pwshspectreconsole can format them
-                WriteObject(result.Renderables, enumerateCollection: true);
+                if (Lines.IsPresent) {
+                    WriteObject(result.Renderables, enumerateCollection: true);
+                }
+                else {
+                    WriteObject(result);
+                }
             }
         }
         catch (Exception ex) {

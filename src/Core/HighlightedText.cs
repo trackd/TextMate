@@ -5,7 +5,7 @@ namespace PSTextMate.Core;
 
 /// <summary>
 /// Represents syntax-highlighted text ready for rendering.
-/// Provides a clean, consistent output type with optional metadata for streaming scenarios.
+/// Provides a clean, consistent output type.
 /// Implements IRenderable so it can be used directly with Spectre.Console.
 /// </summary>
 public sealed class HighlightedText : Renderable {
@@ -18,21 +18,6 @@ public sealed class HighlightedText : Renderable {
     /// Number of lines contained in this highlighted text.
     /// </summary>
     public int LineCount => Renderables.Length;
-
-    /// <summary>
-    /// Optional batch index for streaming scenarios (null for single-batch operations).
-    /// </summary>
-    public int? BatchIndex { get; init; }
-
-    /// <summary>
-    /// Optional file offset (starting line number) for streaming scenarios (null for single-batch operations).
-    /// </summary>
-    public long? FileOffset { get; init; }
-
-    /// <summary>
-    /// Indicates whether this is part of a streaming operation.
-    /// </summary>
-    public bool IsStreaming => BatchIndex.HasValue && FileOffset.HasValue;
 
     /// <summary>
     /// Renders the highlighted text by combining all renderables into a single output.

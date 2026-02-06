@@ -3,7 +3,15 @@ Describe 'Format-PowerShell' {
         $ps = 'function Test-Thing { Write-Output "hi" }'
         $out = $ps | Format-PowerShell
         $out | Should -Not -BeNullOrEmpty
-        $rendered = _GetSpectreRenderable $out -EscapeAnsi
+        $rendered = _GetSpectreRenderable -RenderableObject $out -EscapeAnsi
+        $rendered | Should -Match 'function|Write-Output'
+    }
+
+    It 'Outputs every single line when -Lines is used' {
+        $ps = 'function Test-Thing { Write-Output "hi" }'
+        $lines = $ps | Format-PowerShell -Lines
+        $lines | Should -BeOfType Spectre.Console.Paragraph
+        $rendered = $lines | ForEach-Object { _GetSpectreRenderable -RenderableObject $_ -EscapeAnsi } | Out-String
         $rendered | Should -Match 'function|Write-Output'
     }
 
@@ -11,9 +19,9 @@ Describe 'Format-PowerShell' {
         $filename = Join-Path $PSScriptRoot ('{0}.ps1' -f (Get-Random))
         'function Temp { Write-Output "ok" }' | Set-Content -Path $filename
         try {
-            $out = (Get-Item $filename) | Format-PowerShell
+            $out = Get-Item $filename | Format-PowerShell
             $out | Should -Not -BeNullOrEmpty
-            $renderedFile = _GetSpectreRenderable $out -EscapeAnsi
+            $renderedFile = _GetSpectreRenderable -RenderableObject $out -EscapeAnsi
             $renderedFile | Should -Match 'function|Write-Output'
         } finally {
             Remove-Item -Force -ErrorAction SilentlyContinue $filename
