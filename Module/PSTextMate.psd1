@@ -14,6 +14,7 @@
         'Format-CSharp'
         'Format-Markdown'
         'Format-PowerShell'
+        'Measure-String'
     )
     AliasesToExport      = @(
         'fcs'

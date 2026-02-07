@@ -41,5 +41,104 @@
           </TableRowEntries>
         </TableControl>
     </View>
+    <View>
+      <Name>Grapheme</Name>
+      <ViewSelectedBy>
+        <TypeName>PSTextMate.Helpers.Grapheme+GraphemeMeasurement</TypeName>
+      </ViewSelectedBy>
+      <TableControl>
+        <TableHeaders>
+          <TableColumnHeader>
+            <Label>StringLength</Label>
+          </TableColumnHeader>
+          <TableColumnHeader>
+            <Label>Cells</Label>
+          </TableColumnHeader>
+          <TableColumnHeader>
+            <Label>Length</Label>
+          </TableColumnHeader>
+          <!-- <TableColumnHeader>
+            <Label>EndOffset</Label>
+          </TableColumnHeader> -->
+          <TableColumnHeader>
+            <Label>Wide</Label>
+          </TableColumnHeader>
+          <TableColumnHeader>
+            <Label>VT</Label>
+          </TableColumnHeader>
+          <TableColumnHeader>
+            <Label>Text</Label>
+          </TableColumnHeader>
+        </TableHeaders>
+        <TableRowEntries>
+          <TableRowEntry>
+            <TableColumnItems>
+              <TableColumnItem>
+                <PropertyName>StringLength</PropertyName>
+              </TableColumnItem>
+              <TableColumnItem>
+                <PropertyName>Cells</PropertyName>
+              </TableColumnItem>
+              <TableColumnItem>
+                <PropertyName>Length</PropertyName>
+              </TableColumnItem>
+              <!-- <TableColumnItem>
+                <PropertyName>EndOffset</PropertyName>
+              </TableColumnItem> -->
+              <TableColumnItem>
+                <!-- <PropertyName>HasWideCharacters</PropertyName> -->
+                <ScriptBlock>
+                  # HasWideCharacters
+                  if ($_.HasWideCharacters) {
+                  '{1}{0}{2}' -f (
+                    [char]0xf42e,
+                    "$([char]27)[42m",
+                    "$([char]27)[0m"
+                  )
+                  }
+                  else {
+                  '{1}{0}{2}' -f (
+                    [char]0xEA87,
+                    "$([char]27)[41m",
+                    "$([char]27)[0m"
+                    )
+                  }
+                </ScriptBlock>
+              </TableColumnItem>
+              <TableColumnItem>
+                <!-- <PropertyName>ContainsVT</PropertyName> -->
+                <ScriptBlock>
+                  # ContainsVT
+                  if ($null -eq $_.ContainsVT) {
+                    return '{1}{0}{2}' -f (
+                      [Char]::ConvertFromUtf32(985058),
+                      "$([char]27)[43m",
+                      "$([char]27)[0m"
+                      )
+                  }
+                  if ($_.ContainsVT) {
+                    '{1}{0}{2}' -f (
+                    [char]0xf42e,
+                    "$([char]27)[42m",
+                    "$([char]27)[0m"
+                    )
+                  }
+                  else {
+                    '{1}{0}{2}' -f (
+                    [char]0xEA87,
+                    "$([char]27)[41m",
+                    "$([char]27)[0m"
+                    )
+                  }
+                </ScriptBlock>
+              </TableColumnItem>
+              <TableColumnItem>
+                <PropertyName>Text</PropertyName>
+              </TableColumnItem>
+              </TableColumnItems>
+          </TableRowEntry>
+        </TableRowEntries>
+      </TableControl>
+    </View>
   </ViewDefinitions>
 </Configuration>
