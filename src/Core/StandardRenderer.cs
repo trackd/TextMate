@@ -28,18 +28,17 @@ internal static class StandardRenderer {
         try {
             IStateStack? ruleStack = null;
             for (int lineIndex = 0; lineIndex < lines.Length; lineIndex++) {
-                string line = lines[lineIndex];
-                ITokenizeLineResult result = grammar.TokenizeLine(line, ruleStack, TimeSpan.MaxValue);
-                ruleStack = result.RuleStack;
-
-                if (string.IsNullOrEmpty(line)) {
-                    rows.Add(Text.Empty);
+                if (string.IsNullOrEmpty(lines[lineIndex]))
+                {
+                    rows.Add(new Rows(Text.Empty));
                     continue;
                 }
-
                 var paragraph = new Paragraph();
-                TokenProcessor.ProcessTokensToParagraph(result.Tokens, line, theme, paragraph);
-                rows.Add(paragraph);
+                ITokenizeLineResult result = grammar.TokenizeLine(lines[lineIndex], ruleStack, TimeSpan.MaxValue);
+                ruleStack = result.RuleStack;
+
+                TokenProcessor.ProcessTokensToParagraph(result.Tokens, lines[lineIndex], theme, paragraph);
+                rows.Add(new Rows(paragraph));
             }
 
             return [.. rows];

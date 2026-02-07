@@ -17,45 +17,6 @@ internal static class TokenProcessor {
     // Cache Style results per (scopesKey, themeInstanceHash)
     private static readonly ConcurrentDictionary<(string scopesKey, int themeHash), Style?> _styleCache = new();
 
-    /// <summary>
-    /// Processes tokens in batches for better cache locality and performance.
-    /// This version uses the style cache to avoid re-creating Style objects per token
-    /// and appends text directly into the provided StringBuilder to avoid temporary strings.
-    /// </summary>
-    /// <param name="tokens">Tokens to process</param>
-    /// <param name="line">Source line text</param>
-    /// <param name="theme">Theme for styling</param>
-    /// <param name="builder">StringBuilder for output</param>
-    /// <param name="lineIndex">Line index for debugging context</param>
-    /// <param name="escapeMarkup">Whether to escape markup characters (true for normal text, false for code blocks)</param>
-    public static void ProcessTokensBatch(
-        IToken[] tokens,
-        string line,
-        Theme theme,
-        StringBuilder builder,
-        int? lineIndex = null,
-        bool escapeMarkup = true) {
-        foreach (IToken token in tokens) {
-            int startIndex = Math.Min(token.StartIndex, line.Length);
-            int endIndex = Math.Min(token.EndIndex, line.Length);
-
-            if (startIndex >= endIndex) continue;
-
-            ReadOnlySpan<char> textSpan = line.SpanSubstring(startIndex, endIndex);
-
-            // Use cached Style where possible to avoid rebuilding Style objects per token
-            Style? style = GetStyleForScopes(token.Scopes, theme);
-
-            // Only extract numeric theme properties when debugging is enabled to reduce work
-            (int foreground, int background, FontStyle fontStyle) = (-1, -1, FontStyle.NotSet);
-
-            // Use the returning API so callers can append with style consistently (prevents markup regressions)
-            (string processedText, Style? resolvedStyle) = WriteTokenReturn(textSpan, style, theme, escapeMarkup);
-            builder.AppendWithStyle(resolvedStyle, processedText);
-
-        }
-    }
-
     public static (int foreground, int background, FontStyle fontStyle) ExtractThemeProperties(IToken token, Theme theme) {
         // Build a compact key from token scopes (they're mostly immutable per token)
         string scopesKey = string.Join('\u001F', token.Scopes);
@@ -211,16 +172,17 @@ internal static class TokenProcessor {
             }
         }
     }
-
     /// <summary>
     /// Returns a cached Style for the given scopes and theme. Returns null for default/no-style.
     /// </summary>
-    public static Style? GetStyleForScopes(IEnumerable<string> scopes, Theme theme) {
+    public static Style? GetStyleForScopes(IEnumerable<string> scopes, Theme theme)
+    {
         string scopesKey = string.Join('\u001F', scopes);
         int themeHash = RuntimeHelpers.GetHashCode(theme);
         (string scopesKey, int themeHash) cacheKey = (scopesKey, themeHash);
 
-        if (_styleCache.TryGetValue(cacheKey, out Style? cached)) {
+        if (_styleCache.TryGetValue(cacheKey, out Style? cached))
+        {
             return cached;
         }
 
@@ -228,7 +190,8 @@ internal static class TokenProcessor {
         // Create a dummy token-like enumerable for existing ExtractThemeProperties method
         var token = new MarkdownToken([.. scopes]);
         (int fg, int bg, FontStyle fs) = ExtractThemeProperties(token, theme);
-        if (fg == -1 && bg == -1 && fs == FontStyle.NotSet) {
+        if (fg == -1 && bg == -1 && fs == FontStyle.NotSet)
+        {
             _styleCache.TryAdd(cacheKey, null);
             return null;
         }

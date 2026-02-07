@@ -29,12 +29,13 @@ internal static partial class ParagraphRenderer {
     /// </summary>
     /// <param name="paragraph">The paragraph block to render</param>
     /// <param name="theme">Theme for styling</param>
+    /// <param name="splitOnLineBreaks">When true, emits one Paragraph per line break</param>
     /// <returns>Text segments with proper styling</returns>
-    public static IEnumerable<IRenderable> Render(ParagraphBlock paragraph, Theme theme) {
+    public static IEnumerable<IRenderable> Render(ParagraphBlock paragraph, Theme theme, bool splitOnLineBreaks = false) {
         var segments = new List<IRenderable>();
 
         if (paragraph.Inline is not null) {
-            BuildTextSegments(segments, paragraph.Inline, theme);
+            BuildTextSegments(segments, paragraph.Inline, theme, splitOnLineBreaks: splitOnLineBreaks);
         }
 
         return segments;
@@ -44,8 +45,8 @@ internal static partial class ParagraphRenderer {
     /// Builds Text segments from inline elements with proper Style objects.
     /// Accumulates plain text and flushes when style changes (code, links).
     /// </summary>
-    private static void BuildTextSegments(List<IRenderable> segments, ContainerInline inlines, Theme theme, bool skipLineBreaks = false) {
-        var paragraph = new Paragraph();
+    private static void BuildTextSegments(List<IRenderable> segments, ContainerInline inlines, Theme theme, bool skipLineBreaks = false, bool splitOnLineBreaks = false) {
+        Paragraph paragraph = new Paragraph();
         bool addedAny = false;
 
         List<Inline> inlineList = [.. inlines];
@@ -138,8 +139,17 @@ internal static partial class ParagraphRenderer {
 
                 case LineBreakInline:
                     if (!skipLineBreaks && !isTrailingLineBreak) {
-                        paragraph.Append("\n", Style.Plain);
-                        addedAny = true;
+                        if (splitOnLineBreaks) {
+                            if (addedAny) {
+                                segments.Add(paragraph);
+                            }
+                            paragraph = new Paragraph();
+                            addedAny = false;
+                        }
+                        else {
+                            paragraph.Append("\n", Style.Plain);
+                            addedAny = true;
+                        }
                     }
                     break;
 
@@ -289,8 +299,6 @@ internal static partial class ParagraphRenderer {
         segments = [.. segmentList];
         return true;
     }
-
-
 
     [GeneratedRegex(@"@[a-zA-Z0-9_-]+")]
     private static partial Regex RegNumLet();

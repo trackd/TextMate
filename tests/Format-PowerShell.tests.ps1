@@ -7,11 +7,10 @@ Describe 'Format-PowerShell' {
         $rendered | Should -Match 'function|Write-Output'
     }
 
-    It 'Outputs every single line when -Lines is used' {
+    It 'Formats a simple PowerShell string' {
         $ps = 'function Test-Thing { Write-Output "hi" }'
-        $lines = $ps | Format-PowerShell -Lines
-        $lines | Should -BeOfType Spectre.Console.Paragraph
-        $rendered = $lines | ForEach-Object { _GetSpectreRenderable -RenderableObject $_ -EscapeAnsi } | Out-String
+        $out = $ps | Format-PowerShell
+        $rendered = _GetSpectreRenderable -RenderableObject $out -EscapeAnsi
         $rendered | Should -Match 'function|Write-Output'
     }
 

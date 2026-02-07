@@ -32,7 +32,7 @@ internal static class TableRenderer {
             BorderStyle = GetTableBorderStyle(theme)
         };
 
-        List<(bool isHeader, List<TableCellContent> cells)> allRows = ExtractTableDataOptimized(table, theme);
+        List<(bool isHeader, List<TableCellContent> cells)> allRows = ExtractTableData(table, theme);
 
         if (allRows.Count == 0)
             return null;
@@ -98,9 +98,9 @@ internal static class TableRenderer {
     internal sealed record TableCellContent(string Text, TableColumnAlign? Alignment);
 
     /// <summary>
-    /// Extracts table data with optimized cell content processing.
+    /// Extracts table data cells
     /// </summary>
-    internal static List<(bool isHeader, List<TableCellContent> cells)> ExtractTableDataOptimized(
+    internal static List<(bool isHeader, List<TableCellContent> cells)> ExtractTableData(
         Markdig.Extensions.Tables.Table table, Theme theme) {
         var result = new List<(bool isHeader, List<TableCellContent> cells)>();
 
@@ -110,7 +110,7 @@ internal static class TableRenderer {
 
             for (int i = 0; i < row.Count; i++) {
                 if (row[i] is TableCell cell) {
-                    string cellText = ExtractCellTextOptimized(cell, theme);
+                    string cellText = ExtractCellText(cell, theme);
                     TableColumnAlign? alignment = i < table.ColumnDefinitions.Count ? table.ColumnDefinitions[i].Alignment : null;
                     cells.Add(new TableCellContent(cellText, alignment));
                 }
@@ -125,12 +125,12 @@ internal static class TableRenderer {
     /// <summary>
     /// Extracts text from table cells using optimized inline processing.
     /// </summary>
-    private static string ExtractCellTextOptimized(TableCell cell, Theme theme) {
+    private static string ExtractCellText(TableCell cell, Theme theme) {
         StringBuilder textBuilder = StringBuilderPool.Rent();
 
         foreach (Block block in cell) {
             if (block is ParagraphBlock paragraph && paragraph.Inline is not null) {
-                ExtractInlineTextOptimized(paragraph.Inline, textBuilder);
+                ExtractInlineText(paragraph.Inline, textBuilder);
             }
             else if (block is CodeBlock code) {
                 textBuilder.Append(code.Lines.ToString());
@@ -145,7 +145,7 @@ internal static class TableRenderer {
     /// <summary>
     /// Extracts text from inline elements optimized for table cells.
     /// </summary>
-    private static void ExtractInlineTextOptimized(ContainerInline inlines, StringBuilder builder) {
+    private static void ExtractInlineText(ContainerInline inlines, StringBuilder builder) {
         // Small optimization: use a borrowed buffer for frequently accessed literal content instead of repeated ToString allocations.
         foreach (Inline inline in inlines) {
             switch (inline) {

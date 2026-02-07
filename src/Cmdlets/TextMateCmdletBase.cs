@@ -34,11 +34,6 @@ public abstract class TextMateCmdletBase : PSCmdlet {
     [Parameter]
     public ThemeName Theme { get; set; } = ThemeName.DarkPlus;
 
-    /// <summary>
-    /// When present, output a single HighlightedText container instead of enumerating renderables.
-    /// </summary>
-    [Parameter]
-    public SwitchParameter Lines { get; set; }
 
     /// <summary>
     /// Fixed language or extension token used for rendering.
@@ -70,13 +65,8 @@ public abstract class TextMateCmdletBase : PSCmdlet {
             if (InputObject?.BaseObject is FileInfo file) {
                 try {
                     foreach (HighlightedText result in ProcessPathInput(file)) {
-                        if (Lines.IsPresent) {
-                            WriteObject(result.Renderables, enumerateCollection: true);
-                        }
-                        else
-                        {
+
                             WriteObject(result);
-                        }
                     }
                 }
                 catch (Exception ex) {
@@ -99,13 +89,8 @@ public abstract class TextMateCmdletBase : PSCmdlet {
 
             try {
                 foreach (HighlightedText result in ProcessPathInput(file)) {
-                    if (Lines.IsPresent) {
-                        WriteObject(result.Renderables, enumerateCollection: true);
-                    }
-                    else
-                    {
+
                         WriteObject(result);
-                    }
                 }
             }
             catch (Exception ex) {
@@ -126,13 +111,7 @@ public abstract class TextMateCmdletBase : PSCmdlet {
 
             HighlightedText? result = ProcessStringInput();
             if (result is not null) {
-                if (Lines.IsPresent) {
-                    WriteObject(result.Renderables, enumerateCollection: true);
-                }
-                else
-                {
                     WriteObject(result);
-                }
             }
         }
         catch (Exception ex) {

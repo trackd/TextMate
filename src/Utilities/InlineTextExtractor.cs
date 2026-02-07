@@ -28,6 +28,7 @@ internal static class InlineTextExtractor {
             case LeafInline leaf when leaf is CodeInline code:
                 builder.Append(code.Content);
                 break;
+
             default:
                 break;
         }

@@ -11,16 +11,15 @@ function Foo-Bar {
 }
 
 Describe 'Show-TextMate' {
-    It 'Formats a PSObject with PSChildName and returns rendered output containing the filename' {
+    It 'Formats a PSObject with PSChildName and returns rendered PowerShell output' {
         $out2 = $psowrapped | Show-TextMate
         $out2 | Should -Not -BeNullOrEmpty
         $rendered = _GetSpectreRenderable -RenderableObject $out2 -EscapeAnsi
         $rendered | Should -Match 'FooBar|Foo-Bar'
     }
-    It 'Outputs every single line when -Lines is used' {
-        $out = $psString | Show-TextMate -Lines
-        $out | Should -BeOfType Spectre.Console.Paragraph
-        $rendered = $out | ForEach-Object { _GetSpectreRenderable -RenderableObject $_ -EscapeAnsi } | Out-String
+    It 'Formats a simple PowerShell string' {
+        $out = $psString | Show-TextMate
+        $rendered = _GetSpectreRenderable -RenderableObject $out -EscapeAnsi
         $rendered | Should -Match 'function|Write-Host|Foo-Bar'
     }
     It "Can render markdown" {

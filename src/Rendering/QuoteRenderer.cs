@@ -1,6 +1,4 @@
-using System.Text;
 using Markdig.Syntax;
-using PSTextMate.Utilities;
 using Spectre.Console;
 using Spectre.Console.Rendering;
 using TextMateSharp.Themes;
@@ -18,48 +16,32 @@ internal static class QuoteRenderer {
     /// <param name="theme">Theme for styling</param>
     /// <returns>Rendered quote in a bordered panel</returns>
     public static IRenderable Render(QuoteBlock quote, Theme theme) {
-        string quoteText = ExtractQuoteText(quote, theme);
-
-        var text = new Text(quoteText, Style.Plain);
-        return new Panel(text)
-            .Border(BoxBorder.Heavy)
-            .Header("quote", Justify.Left);
-    }
-
-    /// <summary>
-    /// Extracts text content from all blocks within the quote.
-    /// </summary>
-    private static string ExtractQuoteText(QuoteBlock quote, Theme theme) {
-        string quoteText = string.Empty;
-        bool isFirstParagraph = true;
+        var rows = new List<IRenderable>();
+        bool needsGap = false;
 
         foreach (Block subBlock in quote) {
-            if (subBlock is ParagraphBlock para) {
-                // Add newline between multiple paragraphs
-                if (!isFirstParagraph)
-                    quoteText += "\n";
+            if (needsGap) {
+                rows.Add(Text.Empty);
+            }
 
-                StringBuilder quoteBuilder = StringBuilderPool.Rent();
-                try {
-                    if (para.Inline is not null) {
-                        InlineTextExtractor.ExtractText(para.Inline, quoteBuilder);
-                    }
-                    quoteText += quoteBuilder.ToString();
-                }
-                finally {
-                    StringBuilderPool.Return(quoteBuilder);
-                }
-
-                isFirstParagraph = false;
+            if (subBlock is ParagraphBlock paragraph) {
+                rows.AddRange(ParagraphRenderer.Render(paragraph, theme, splitOnLineBreaks: true));
             }
             else {
-                quoteText += subBlock.ToString();
+                rows.Add(new Text(subBlock.ToString() ?? string.Empty, Style.Plain));
             }
+
+            needsGap = true;
         }
 
-        // Trim trailing whitespace/newlines
-        quoteText = quoteText.TrimEnd();
+        IRenderable content = rows.Count switch {
+            0 => Text.Empty,
+            1 => rows[0],
+            _ => new Rows(rows)
+        };
 
-        return quoteText;
+        return new Panel(content)
+            .Border(BoxBorder.Heavy)
+            .Header("quote", Justify.Left);
     }
 }

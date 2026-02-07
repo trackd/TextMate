@@ -31,6 +31,7 @@ This is a new paragraph after a blank line.
 ## Lists
 
 - Unordered item 1
+  - [ ] Incomplete sub-task 1
 - Unordered item 2
   - Nested item
 - Unordered item 3
@@ -39,6 +40,7 @@ This is a new paragraph after a blank line.
 1. Ordered item 1
 2. Ordered item 2
    1. Nested ordered item
+      1. three level nest list 2
 3. Ordered item 3
 
 - [x] Completed task

@@ -28,7 +28,7 @@ internal static class CodeBlockRenderer {
     /// <returns>Rendered code block in a panel</returns>
     public static IRenderable RenderFencedCodeBlock(FencedCodeBlock fencedCode, Theme theme, ThemeName themeName) {
         string[] codeLines = ExtractCodeLinesWithWhitespaceHandling(fencedCode.Lines);
-        string language = ExtractLanguageImproved(fencedCode.Info);
+        string language = ExtractLanguage(fencedCode.Info);
 
         if (!string.IsNullOrEmpty(language)) {
             try {
@@ -45,7 +45,7 @@ internal static class CodeBlockRenderer {
         }
 
         // Fallback: create Text object directly instead of markup strings
-        return CreateOptimizedCodePanel(codeLines, language, theme);
+        return CreateCodePanel(codeLines, language, theme);
     }    /// <summary>
          /// Renders an indented code block with proper whitespace handling.
          /// </summary>
@@ -54,7 +54,7 @@ internal static class CodeBlockRenderer {
          /// <returns>Rendered code block in a panel</returns>
     public static IRenderable RenderCodeBlock(CodeBlock code, Theme theme) {
         string[] codeLines = ExtractCodeLinesFromStringLineGroup(code.Lines);
-        return CreateOptimizedCodePanel(codeLines, "code", theme);
+        return CreateCodePanel(codeLines, "code", theme);
     }
 
     /// <summary>
@@ -111,7 +111,7 @@ internal static class CodeBlockRenderer {
     /// <summary>
     /// Improved language extraction with better detection patterns.
     /// </summary>
-    private static string ExtractLanguageImproved(string? info) {
+    private static string ExtractLanguage(string? info) {
         if (string.IsNullOrWhiteSpace(info))
             return string.Empty;
 
@@ -197,7 +197,7 @@ internal static class CodeBlockRenderer {
     /// Creates an optimized code panel using Text objects instead of markup strings.
     /// This eliminates VT escaping issues and improves performance.
     /// </summary>
-    private static Panel CreateOptimizedCodePanel(string[] codeLines, string language, Theme theme) {
+    private static Panel CreateCodePanel(string[] codeLines, string language, Theme theme) {
         // Get theme colors for code blocks
         string[] codeScopes = ["text.html.markdown", "markup.fenced_code.block.markdown"];
         (int codeFg, int codeBg, FontStyle codeFs) = TokenProcessor.ExtractThemeProperties(

@@ -7,12 +7,10 @@ Describe 'Format-Markdown' {
         $rendered | Should -Match '# Title|Title|Some text'
     }
 
-    It 'Outputs every single line when -Lines is used' {
+    It 'Formats Markdown' {
         $md = "# Title\n\nSome text"
-        $Lines = $md | Format-Markdown -Lines
-        $Lines | Should -BeOfType Spectre.Console.Paragraph
-        $rendered = _GetSpectreRenderable -RenderableObject $Lines
-        $rendered = $Lines | ForEach-Object { _GetSpectreRenderable -RenderableObject $_ } | Out-String
+        $out = $md | Format-Markdown
+        $rendered = _GetSpectreRenderable -RenderableObject $out
         $rendered | Should -Match '# Title|Title|Some text'
     }
 

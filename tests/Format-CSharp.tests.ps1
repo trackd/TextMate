@@ -4,15 +4,14 @@ Describe 'Format-CSharp' {
         $out = $code | Format-CSharp
         $out | Should -Not -BeNullOrEmpty
         $rendered = _GetSpectreRenderable -RenderableObject $out -EscapeAnsi
-        $rendered | Should -Match 'class|public class|namespace'
+        $rendered | Should -Match 'public class Foo'
     }
 
-        It 'Outputs every single line when -Lines is used' {
+        It 'Formats a simple C# string' {
             $code = 'public class Foo { }'
-            $lines = $code | Format-CSharp -Lines
-            $lines | Should -BeOfType Spectre.Console.Paragraph
-            $rendered = $lines | ForEach-Object { _GetSpectreRenderable -RenderableObject $_ -EscapeAnsi } | Out-String
-            $rendered | Should -Match 'class|public class|namespace'
+            $out = $code | Format-CSharp
+            $rendered = _GetSpectreRenderable -RenderableObject $out -EscapeAnsi
+            $rendered | Should -Match 'public class Foo'
         }
 
     It 'Formats a C# file and returns renderables' {
@@ -22,7 +21,7 @@ Describe 'Format-CSharp' {
             $out = Get-Item $temp | Format-CSharp
             $out | Should -Not -BeNullOrEmpty
             $rendered = _GetSpectreRenderable -RenderableObject $out -EscapeAnsi
-            $rendered | Should -Match 'class|public class|namespace'
+            $rendered | Should -Match 'public class Temp'
         } finally {
             Remove-Item -Force -ErrorAction SilentlyContinue $temp
         }

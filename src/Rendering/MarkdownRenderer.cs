@@ -53,7 +53,7 @@ internal static class MarkdownRenderer {
                 int previousEndLine = GetBlockEndLine(previousBlock, markdown);
                 int gap = block.Line - previousEndLine - 1;
                 for (int j = 0; j < gap; j++) {
-                    rows.Add(Text.Empty);
+                    rows.Add(new Rows(Text.Empty));
                 }
             }
 
