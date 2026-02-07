@@ -28,8 +28,7 @@ internal static class StandardRenderer {
         try {
             IStateStack? ruleStack = null;
             for (int lineIndex = 0; lineIndex < lines.Length; lineIndex++) {
-                if (string.IsNullOrEmpty(lines[lineIndex]))
-                {
+                if (string.IsNullOrEmpty(lines[lineIndex])) {
                     rows.Add(new Rows(Text.Empty));
                     continue;
                 }

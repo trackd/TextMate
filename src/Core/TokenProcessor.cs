@@ -175,14 +175,12 @@ internal static class TokenProcessor {
     /// <summary>
     /// Returns a cached Style for the given scopes and theme. Returns null for default/no-style.
     /// </summary>
-    public static Style? GetStyleForScopes(IEnumerable<string> scopes, Theme theme)
-    {
+    public static Style? GetStyleForScopes(IEnumerable<string> scopes, Theme theme) {
         string scopesKey = string.Join('\u001F', scopes);
         int themeHash = RuntimeHelpers.GetHashCode(theme);
         (string scopesKey, int themeHash) cacheKey = (scopesKey, themeHash);
 
-        if (_styleCache.TryGetValue(cacheKey, out Style? cached))
-        {
+        if (_styleCache.TryGetValue(cacheKey, out Style? cached)) {
             return cached;
         }
 
@@ -190,8 +188,7 @@ internal static class TokenProcessor {
         // Create a dummy token-like enumerable for existing ExtractThemeProperties method
         var token = new MarkdownToken([.. scopes]);
         (int fg, int bg, FontStyle fs) = ExtractThemeProperties(token, theme);
-        if (fg == -1 && bg == -1 && fs == FontStyle.NotSet)
-        {
+        if (fg == -1 && bg == -1 && fs == FontStyle.NotSet) {
             _styleCache.TryAdd(cacheKey, null);
             return null;
         }

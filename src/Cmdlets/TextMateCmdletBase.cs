@@ -12,8 +12,6 @@ namespace PSTextMate.Commands;
 /// </summary>
 public abstract class TextMateCmdletBase : PSCmdlet {
     private readonly List<string> _inputObjectBuffer = [];
-    private string? _sourceBaseDirectory;
-    private string? _sourceExtensionHint;
 
     /// <summary>
     /// String content or file path to render with syntax highlighting.
@@ -80,12 +78,12 @@ public abstract class TextMateCmdletBase : PSCmdlet {
     /// <summary>
     /// Resolved extension hint from the pipeline input.
     /// </summary>
-    protected string? SourceExtensionHint => _sourceExtensionHint;
+    protected string? SourceExtensionHint { get; private set; }
 
     /// <summary>
     /// Resolved base directory for markdown rendering.
     /// </summary>
-    protected string? SourceBaseDirectory => _sourceBaseDirectory;
+    protected string? SourceBaseDirectory { get; private set; }
 
     protected override void ProcessRecord() {
         if (MyInvocation.ExpectingInput) {
@@ -93,7 +91,7 @@ public abstract class TextMateCmdletBase : PSCmdlet {
                 try {
                     foreach (HighlightedText result in ProcessPathInput(file)) {
 
-                            WriteObject(result);
+                        WriteObject(result);
                     }
                 }
                 catch (Exception ex) {
@@ -117,7 +115,7 @@ public abstract class TextMateCmdletBase : PSCmdlet {
             try {
                 foreach (HighlightedText result in ProcessPathInput(file)) {
 
-                        WriteObject(result);
+                    WriteObject(result);
                 }
             }
             catch (Exception ex) {
@@ -138,7 +136,7 @@ public abstract class TextMateCmdletBase : PSCmdlet {
 
             HighlightedText? result = ProcessStringInput();
             if (result is not null) {
-                    WriteObject(result);
+                WriteObject(result);
             }
         }
         catch (Exception ex) {
@@ -190,13 +188,9 @@ public abstract class TextMateCmdletBase : PSCmdlet {
         }
     }
 
-    protected virtual (string token, bool asExtension) ResolveTokenForStringInput() {
-        return ResolveFixedToken();
-    }
+    protected virtual (string token, bool asExtension) ResolveTokenForStringInput() => ResolveFixedToken();
 
-    protected virtual (string token, bool asExtension) ResolveTokenForPathInput(FileInfo filePath) {
-        return ResolveFixedToken();
-    }
+    protected virtual (string token, bool asExtension) ResolveTokenForPathInput(FileInfo filePath) => ResolveFixedToken();
 
     protected (string token, bool asExtension) ResolveFixedToken() {
         if (!FixedTokenIsExtension) {
@@ -212,7 +206,7 @@ public abstract class TextMateCmdletBase : PSCmdlet {
             return;
         }
 
-        if (_sourceBaseDirectory is not null && _sourceExtensionHint is not null) {
+        if (SourceBaseDirectory is not null && SourceExtensionHint is not null) {
             return;
         }
 
@@ -223,7 +217,7 @@ public abstract class TextMateCmdletBase : PSCmdlet {
             return;
         }
 
-        if (_sourceExtensionHint is null) {
+        if (SourceExtensionHint is null) {
             string ext = Path.GetExtension(hint);
             if (string.IsNullOrWhiteSpace(ext)) {
                 string resolvedHint = GetUnresolvedProviderPathFromPSPath(hint);
@@ -231,16 +225,16 @@ public abstract class TextMateCmdletBase : PSCmdlet {
             }
 
             if (!string.IsNullOrWhiteSpace(ext)) {
-                _sourceExtensionHint = ext;
+                SourceExtensionHint = ext;
                 WriteVerbose($"Detected extension hint from input: {ext}");
             }
         }
 
-        if (_sourceBaseDirectory is null) {
+        if (SourceBaseDirectory is null) {
             string resolvedPath = GetUnresolvedProviderPathFromPSPath(hint);
             string? baseDir = Path.GetDirectoryName(resolvedPath);
             if (!string.IsNullOrWhiteSpace(baseDir)) {
-                _sourceBaseDirectory = baseDir;
+                SourceBaseDirectory = baseDir;
                 Rendering.ImageRenderer.CurrentMarkdownDirectory = baseDir;
                 WriteVerbose($"Set markdown base directory from input: {baseDir}");
             }

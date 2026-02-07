@@ -1,7 +1,7 @@
-using Spectre.Console;
-using Spectre.Console.Rendering;
 using System.Globalization;
 using System.Linq;
+using Spectre.Console;
+using Spectre.Console.Rendering;
 
 namespace PSTextMate.Core;
 
@@ -48,11 +48,7 @@ public sealed class HighlightedText : Renderable {
         // Delegate to Rows which efficiently renders all renderables
         var rows = new Rows(Renderables);
 
-        if (!ShowLineNumbers) {
-            return ((IRenderable)rows).Render(options, maxWidth);
-        }
-
-        return RenderWithLineNumbers(rows, options, maxWidth);
+        return !ShowLineNumbers ? ((IRenderable)rows).Render(options, maxWidth) : RenderWithLineNumbers(rows, options, maxWidth);
     }
 
     /// <summary>
@@ -62,11 +58,7 @@ public sealed class HighlightedText : Renderable {
         // Delegate to Rows for measurement
         var rows = new Rows(Renderables);
 
-        if (!ShowLineNumbers) {
-            return ((IRenderable)rows).Measure(options, maxWidth);
-        }
-
-        return MeasureWithLineNumbers(rows, options, maxWidth);
+        return !ShowLineNumbers ? ((IRenderable)rows).Measure(options, maxWidth) : MeasureWithLineNumbers(rows, options, maxWidth);
     }
 
     private IEnumerable<Segment> RenderWithLineNumbers(Rows rows, RenderOptions options, int maxWidth) {
@@ -84,14 +76,14 @@ public sealed class HighlightedText : Renderable {
     private (List<Segment> segments, int width, int contentWidth) RenderInnerSegments(Rows rows, RenderOptions options, int maxWidth) {
         int width = ResolveLineNumberWidth(LineCount);
         int contentWidth = Math.Max(1, maxWidth - (width + GutterSeparator.Length));
-        List<Segment> segments = ((IRenderable)rows).Render(options, contentWidth).ToList();
+        var segments = ((IRenderable)rows).Render(options, contentWidth).ToList();
 
         int actualLineCount = CountLines(segments);
         int actualWidth = ResolveLineNumberWidth(actualLineCount);
         if (actualWidth != width) {
             width = actualWidth;
             contentWidth = Math.Max(1, maxWidth - (width + GutterSeparator.Length));
-            segments = ((IRenderable)rows).Render(options, contentWidth).ToList();
+            segments = [.. ((IRenderable)rows).Render(options, contentWidth)];
         }
 
         return (segments, width, contentWidth);
@@ -116,13 +108,13 @@ public sealed class HighlightedText : Renderable {
     }
 
     private static IEnumerable<List<Segment>> SplitLines(IEnumerable<Segment> segments) {
-        List<Segment> current = new();
+        List<Segment> current = [];
         bool sawLineBreak = false;
 
         foreach (Segment segment in segments) {
             if (segment.IsLineBreak) {
                 yield return current;
-                current = new List<Segment>();
+                current = [];
                 sawLineBreak = true;
                 continue;
             }
@@ -143,11 +135,7 @@ public sealed class HighlightedText : Renderable {
         }
 
         int lineBreaks = segments.Count(segment => segment.IsLineBreak);
-        if (lineBreaks == 0) {
-            return 1;
-        }
-
-        return segments[^1].IsLineBreak ? lineBreaks : lineBreaks + 1;
+        return lineBreaks == 0 ? 1 : segments[^1].IsLineBreak ? lineBreaks : lineBreaks + 1;
     }
 
     private int ResolveLineNumberWidth(int lineCount) {

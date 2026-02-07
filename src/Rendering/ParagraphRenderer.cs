@@ -46,7 +46,7 @@ internal static partial class ParagraphRenderer {
     /// Accumulates plain text and flushes when style changes (code, links).
     /// </summary>
     private static void BuildTextSegments(List<IRenderable> segments, ContainerInline inlines, Theme theme, bool skipLineBreaks = false, bool splitOnLineBreaks = false) {
-        Paragraph paragraph = new Paragraph();
+        var paragraph = new Paragraph();
         bool addedAny = false;
 
         List<Inline> inlineList = [.. inlines];

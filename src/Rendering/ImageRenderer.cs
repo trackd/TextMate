@@ -153,11 +153,9 @@ public static class ImageRenderer {
     /// Attempts to create a sixel renderable using the newest available implementation.
     /// </summary>
     private static bool TryCreateSixelRenderable(string imagePath, int? maxWidth, int? maxHeight, out IRenderable? result) {
-        if (TryCreatePixelImage(imagePath, maxWidth, out result)) {
-            return true;
-        }
-
-        return TryCreateSpectreSixelImage(imagePath, maxWidth, maxHeight, out result);
+        return TryCreatePixelImage(imagePath, maxWidth, out result)
+            ? true
+            : TryCreateSpectreSixelImage(imagePath, maxWidth, maxHeight, out result);
     }
 
     /// <summary>
@@ -167,7 +165,7 @@ public static class ImageRenderer {
         result = null;
 
         try {
-            Type? pixelImageType = Type.GetType("PwshSpectreConsole.PixelImage, PwshSpectreConsole");
+            var pixelImageType = Type.GetType("PwshSpectreConsole.PixelImage, PwshSpectreConsole");
             if (pixelImageType is null) {
                 return false;
             }

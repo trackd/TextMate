@@ -100,8 +100,7 @@ public static class TextMateProcessor {
         List<IRenderable> rows = new(lines.Length);
         IStateStack? ruleStack = null;
         for (int lineIndex = 0; lineIndex < lines.Length; lineIndex++) {
-            if (String.IsNullOrEmpty(lines[lineIndex]))
-            {
+            if (string.IsNullOrEmpty(lines[lineIndex])) {
                 rows.Add(new Rows(Text.Empty));
                 continue;
             }

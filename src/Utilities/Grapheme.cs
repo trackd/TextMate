@@ -10,14 +10,15 @@ namespace PSTextMate.Helpers;
 public static class Grapheme {
 
     /// <summary>
-    /// grapheme measurement values.
+    /// grapheme measurement
     /// </summary>
-    /// <param name="InputLength">UTF-16 length of the input string.</param>
-    /// <param name="CursorMovements">Number of grapheme cursor movements.</param>
-    /// <param name="Columns">Total column width of graphemes.</param>
+    /// <param name="Text">Input string.</param>
+    /// <param name="StringLength">UTF-16 length of the input string.</param>
+    /// <param name="Cells">Number of grapheme cursor movements.</param>
+    /// <param name="Length">Total column width of graphemes.</param>
     /// <param name="EndOffset">UTF-16 offset where measurement stopped.</param>
-    public readonly struct GraphemeMeasurement
-    {
+    /// <param name="ContainsVT">String contains VT/OSC/CSI.</param>
+    public readonly struct GraphemeMeasurement {
         public string Text { get; }
         public int StringLength => Text.Length;
         /// CursorMovements
@@ -27,8 +28,7 @@ public static class Grapheme {
         public int EndOffset { get; }
         public bool HasWideCharacters { get; }
         public bool? ContainsVT { get; }
-        public GraphemeMeasurement(string input, int cells, int length, int endOffset, bool? containsVT)
-        {
+        public GraphemeMeasurement(string input, int cells, int length, int endOffset, bool? containsVT) {
             Text = input;
             Cells = cells;
             Length = length;
@@ -47,12 +47,10 @@ public static class Grapheme {
     /// <param name="maxCursorMovements"></param>
     /// <param name="maxColumns"></param>
     /// <returns>Combined grapheme measurement.</returns>
-    public static GraphemeMeasurement Measure(string input, bool useVT = false, int maxCursorMovements = int.MaxValue, int maxColumns = int.MaxValue)
-    {
+    public static GraphemeMeasurement Measure(string input, bool useVT = true, int maxCursorMovements = int.MaxValue, int maxColumns = int.MaxValue) {
         ArgumentNullException.ThrowIfNull(input);
 
-        if (useVT)
-        {
+        if (useVT) {
             MeasurementResult forward = MeasureForwardVT(input, 0, maxCursorMovements, maxColumns, out bool containsVT);
             return new GraphemeMeasurement(input, forward.CursorMovements, forward.Columns, forward.Offset, containsVT);
         }
@@ -76,8 +74,8 @@ public static class Grapheme {
     /// <param name="input"></param>
     /// <param name="useVT">When true, VT escape sequences are ignored.</param>
     /// <returns>Visible column width.</returns>
-    public static int VisibleStringLength(string input, bool useVT = true) =>
-        Measure(input, useVT).Length;
+    public static int VisibleLength(string input, bool useVT = true) =>
+        Measure(input, useVT).Cells;
 
     /// <summary>
     /// Unicode tables
@@ -490,16 +488,14 @@ public static class Grapheme {
     /// helper methods
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int UcdLookup(uint cp)
-    {
+    private static int UcdLookup(uint cp) {
         byte s0 = s_stage0[cp >> 11];
         ushort s1 = s_stage1[s0 + ((cp >> 8) & 7)];
         ushort s2 = s_stage2[s1 + ((cp >> 4) & 15)];
         return s_stage3[s2 + ((cp >> 0) & 15)];
     }
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static uint UcdGraphemeJoins(uint state, int lead, int trail)
-    {
+    private static uint UcdGraphemeJoins(uint state, int lead, int trail) {
         int l = lead & 15;
         int t = trail & 15;
         return (s_joinRules[state][l] >> (t * 2)) & 3;
@@ -509,24 +505,20 @@ public static class Grapheme {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static int UcdToCharacterWidth(int val) => val >> 6;
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static int Utf16NextOrFFFD(string str, int offset, out uint cp)
-    {
+    private static int Utf16NextOrFFFD(string str, int offset, out uint cp) {
         uint c = str[offset];
         offset++;
 
         // Is any surrogate?
-        if ((c & 0xF800) == 0xD800)
-        {
+        if ((c & 0xF800) == 0xD800) {
             uint c1 = c;
             c = 0xfffd;
 
             // Is leading surrogate and not at end?
-            if ((c1 & 0x400) == 0 && offset < str.Length)
-            {
+            if ((c1 & 0x400) == 0 && offset < str.Length) {
                 char c2 = str[offset];
                 // Is also trailing surrogate!
-                if ((c2 & 0xFC00) == 0xDC00)
-                {
+                if ((c2 & 0xFC00) == 0xDC00) {
                     c = (c1 << 10) - 0x35FDC00 + c2;
                     offset++;
                 }
@@ -538,39 +530,31 @@ public static class Grapheme {
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool TrySkipVTForward(string str, ref int offset)
-    {
+    private static bool TrySkipVTForward(string str, ref int offset) {
         int length = str.Length;
 
-        if (offset >= length)
-        {
+        if (offset >= length) {
             return false;
         }
 
         char first = str[offset];
         int index = offset;
 
-        switch (first)
-        {
+        switch (first) {
             case '\u001b':
-                if (index + 1 >= length)
-                {
+                if (index + 1 >= length) {
                     offset = length;
                     return true;
                 }
 
-                char escNext = str[index + 1];
-
-                if (escNext == '[')
-                {
+                if (str[index + 1] == '[') {
                     index += 2;
                     SkipCsi(str, length, ref index);
                     offset = index;
                     return true;
                 }
 
-                if (escNext is ']' or 'P' or '^' or '_')
-                {
+                if (str[index + 1] is ']' or 'P' or '^' or '_') {
                     index += 2;
                     SkipOscLike(str, length, ref index);
                     offset = index;
@@ -601,20 +585,14 @@ public static class Grapheme {
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void SkipCsi(string str, int length, ref int index)
-    {
-        while (index < length)
-        {
-            char ch = str[index];
-
-            if (ch is >= (char)0x40 and <= (char)0x7e)
-            {
+    private static void SkipCsi(string str, int length, ref int index) {
+        while (index < length) {
+            if (str[index] is >= (char)0x40 and <= (char)0x7e) {
                 index++;
                 return;
             }
 
-            if (ch is < (char)0x20 or > (char)0x3f)
-            {
+            if (str[index] is < (char)0x20 or > (char)0x3f) {
                 index++;
                 return;
             }
@@ -624,24 +602,17 @@ public static class Grapheme {
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void SkipOscLike(string str, int length, ref int index)
-    {
-        while (index < length)
-        {
-            char ch = str[index];
-
-            if (ch == '\u0007')
-            {
+    private static void SkipOscLike(string str, int length, ref int index) {
+        while (index < length) {
+            if (str[index] == '\u0007') {
                 index++;
                 return;
             }
 
-            if (ch == '\u001b' && index + 1 < length && str[index + 1] == '\\')
-            {
+            if (str[index] == '\u001b' && index + 1 < length && str[index + 1] == '\\') {
                 index += 2;
                 return;
             }
-
             index++;
         }
     }
@@ -654,38 +625,32 @@ public static class Grapheme {
     /// <param name="maxCursorMovements"></param>
     /// <param name="maxColumns"></param>
     /// <returns></returns>
-    public static MeasurementResult MeasureForward(string str, int offset = 0, int maxCursorMovements = int.MaxValue, int maxColumns = int.MaxValue)
-    {
-        var cursorMovements = 0;
-        var columns = 0;
+    public static MeasurementResult MeasureForward(string str, int offset = 0, int maxCursorMovements = int.MaxValue, int maxColumns = int.MaxValue) {
+        int cursorMovements = 0;
+        int columns = 0;
 
-        if (offset < str.Length && maxCursorMovements > 0 && maxColumns > 0)
-        {
-            var offsetTrail = Utf16NextOrFFFD(str, offset, out var cp);
-            var lead = UcdLookup(cp);
+        if (offset < str.Length && maxCursorMovements > 0 && maxColumns > 0) {
+            int offsetTrail = Utf16NextOrFFFD(str, offset, out uint cp);
+            int lead = UcdLookup(cp);
 
-            while (true)
-            {
-                var offsetLead = offsetTrail;
-                var width = 0;
+            while (true) {
+                int offsetLead = offsetTrail;
+                int width = 0;
                 uint state = 0;
 
-                while (true)
-                {
+                while (true) {
                     width += UcdToCharacterWidth(lead);
 
-                    if (offsetTrail >= str.Length)
-                    {
+                    if (offsetTrail >= str.Length) {
                         break;
                     }
 
                     offsetTrail = Utf16NextOrFFFD(str, offsetTrail, out cp);
-                    var trail = UcdLookup(cp);
+                    int trail = UcdLookup(cp);
                     state = UcdGraphemeJoins(state, lead, trail);
                     lead = trail;
 
-                    if (UcdGraphemeDone(state))
-                    {
+                    if (UcdGraphemeDone(state)) {
                         break;
                     }
 
@@ -694,8 +659,7 @@ public static class Grapheme {
 
                 width = Math.Min(2, width);
 
-                if (columns + width > maxColumns || cursorMovements + 1 > maxCursorMovements)
-                {
+                if (columns + width > maxColumns || cursorMovements + 1 > maxCursorMovements) {
                     break;
                 }
 
@@ -703,8 +667,7 @@ public static class Grapheme {
                 cursorMovements += 1;
                 columns += width;
 
-                if (offset >= str.Length)
-                {
+                if (offset >= str.Length) {
                     break;
                 }
             }
@@ -724,8 +687,7 @@ public static class Grapheme {
     public static MeasurementResult MeasureForwardVT(string str, int offset = 0, int maxCursorMovements = int.MaxValue, int maxColumns = int.MaxValue) =>
         MeasureForwardVT(str, offset, maxCursorMovements, maxColumns, out _);
 
-    private static MeasurementResult MeasureForwardVT(string str, int offset, int maxCursorMovements, int maxColumns, out bool containsVT)
-    {
+    private static MeasurementResult MeasureForwardVT(string str, int offset, int maxCursorMovements, int maxColumns, out bool containsVT) {
         int cursorMovements = 0;
         int columns = 0;
         bool sawVT = false;
