@@ -1,3 +1,9 @@
+BeforeAll {
+    if (-Not (Get-Module 'PSTextMate')) {
+        Import-Module (Join-Path $PSScriptRoot '..' 'output' 'PSTextMate.psd1') -ErrorAction Stop
+    }
+}
+
 Describe 'Format-CSharp' {
     It 'Formats a simple C# string and returns renderables' {
         $code = 'public class Foo { }'

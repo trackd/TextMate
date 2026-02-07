@@ -1,3 +1,9 @@
+BeforeAll {
+    if (-not (Get-Module 'PSTextMate')) {
+        Import-Module (Join-Path $PSScriptRoot '..' 'output' 'PSTextMate.psd1') -ErrorAction Stop
+    }
+}
+
 Describe 'Format-PowerShell' {
     It 'Formats a simple PowerShell string and returns renderables' {
         $ps = 'function Test-Thing { Write-Output "hi" }'

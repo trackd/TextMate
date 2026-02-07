@@ -1,3 +1,9 @@
+BeforeAll {
+    if (-not (Get-Module 'PSTextMate')) {
+        Import-Module (Join-Path $PSScriptRoot '..' 'output' 'PSTextMate.psd1') -ErrorAction Stop
+    }
+}
+
 Describe 'Format-Markdown' {
     It 'Formats Markdown and returns renderables' {
         $md = "# Title\n\nSome text"

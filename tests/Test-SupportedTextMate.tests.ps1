@@ -1,3 +1,9 @@
+BeforeAll {
+    if (-not (Get-Module 'PSTextMate')) {
+        Import-Module (Join-Path $PSScriptRoot '..' 'output' 'PSTextMate.psd1') -ErrorAction Stop
+    }
+}
+
 Describe 'Test-SupportedTextMate' {
     It 'Recognizes powershell language' {
         Test-SupportedTextMate -Language 'powershell' | Should -BeTrue

@@ -1,4 +1,10 @@
 BeforeAll {
+    if (-not (Get-Module 'PSTextMate')) {
+        Import-Module (Join-Path $PSScriptRoot '..' 'output' 'PSTextMate.psd1') -ErrorAction Stop
+    }
+}
+
+BeforeAll {
     $psString = @'
 function Foo-Bar {
     param([string]$Name)
