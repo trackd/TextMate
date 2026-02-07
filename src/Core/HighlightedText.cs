@@ -1,5 +1,7 @@
 using Spectre.Console;
 using Spectre.Console.Rendering;
+using System.Globalization;
+using System.Linq;
 
 namespace PSTextMate.Core;
 
@@ -15,6 +17,26 @@ public sealed class HighlightedText : Renderable {
     public required IRenderable[] Renderables { get; init; }
 
     /// <summary>
+    /// When true, prepend line numbers with a gutter separator.
+    /// </summary>
+    public bool ShowLineNumbers { get; init; }
+
+    /// <summary>
+    /// Starting line number for the gutter.
+    /// </summary>
+    public int LineNumberStart { get; init; } = 1;
+
+    /// <summary>
+    /// Optional fixed width for the line number column.
+    /// </summary>
+    public int? LineNumberWidth { get; init; }
+
+    /// <summary>
+    /// Separator inserted between the line number and content.
+    /// </summary>
+    public string GutterSeparator { get; init; } = " │ ";
+
+    /// <summary>
     /// Number of lines contained in this highlighted text.
     /// </summary>
     public int LineCount => Renderables.Length;
@@ -25,7 +47,12 @@ public sealed class HighlightedText : Renderable {
     protected override IEnumerable<Segment> Render(RenderOptions options, int maxWidth) {
         // Delegate to Rows which efficiently renders all renderables
         var rows = new Rows(Renderables);
-        return ((IRenderable)rows).Render(options, maxWidth);
+
+        if (!ShowLineNumbers) {
+            return ((IRenderable)rows).Render(options, maxWidth);
+        }
+
+        return RenderWithLineNumbers(rows, options, maxWidth);
     }
 
     /// <summary>
@@ -34,7 +61,102 @@ public sealed class HighlightedText : Renderable {
     protected override Measurement Measure(RenderOptions options, int maxWidth) {
         // Delegate to Rows for measurement
         var rows = new Rows(Renderables);
-        return ((IRenderable)rows).Measure(options, maxWidth);
+
+        if (!ShowLineNumbers) {
+            return ((IRenderable)rows).Measure(options, maxWidth);
+        }
+
+        return MeasureWithLineNumbers(rows, options, maxWidth);
+    }
+
+    private IEnumerable<Segment> RenderWithLineNumbers(Rows rows, RenderOptions options, int maxWidth) {
+        (List<Segment> segments, int width, int contentWidth) = RenderInnerSegments(rows, options, maxWidth);
+        return PrefixLineNumbers(segments, options, width, contentWidth);
+    }
+
+    private Measurement MeasureWithLineNumbers(Rows rows, RenderOptions options, int maxWidth) {
+        (List<Segment> segments, int width, int contentWidth) = RenderInnerSegments(rows, options, maxWidth);
+        Measurement measurement = ((IRenderable)rows).Measure(options, contentWidth);
+        int gutterWidth = width + GutterSeparator.Length;
+        return new Measurement(measurement.Min + gutterWidth, measurement.Max + gutterWidth);
+    }
+
+    private (List<Segment> segments, int width, int contentWidth) RenderInnerSegments(Rows rows, RenderOptions options, int maxWidth) {
+        int width = ResolveLineNumberWidth(LineCount);
+        int contentWidth = Math.Max(1, maxWidth - (width + GutterSeparator.Length));
+        List<Segment> segments = ((IRenderable)rows).Render(options, contentWidth).ToList();
+
+        int actualLineCount = CountLines(segments);
+        int actualWidth = ResolveLineNumberWidth(actualLineCount);
+        if (actualWidth != width) {
+            width = actualWidth;
+            contentWidth = Math.Max(1, maxWidth - (width + GutterSeparator.Length));
+            segments = ((IRenderable)rows).Render(options, contentWidth).ToList();
+        }
+
+        return (segments, width, contentWidth);
+    }
+
+    private IEnumerable<Segment> PrefixLineNumbers(List<Segment> segments, RenderOptions options, int width, int contentWidth) {
+        int lineNumber = LineNumberStart;
+
+        foreach (List<Segment> line in SplitLines(segments)) {
+            string label = lineNumber.ToString(CultureInfo.InvariantCulture).PadLeft(width) + GutterSeparator;
+            foreach (Segment segment in ((IRenderable)new Text(label)).Render(options, contentWidth)) {
+                yield return segment;
+            }
+
+            foreach (Segment segment in line) {
+                yield return segment;
+            }
+
+            yield return Segment.LineBreak;
+            lineNumber++;
+        }
+    }
+
+    private static IEnumerable<List<Segment>> SplitLines(IEnumerable<Segment> segments) {
+        List<Segment> current = new();
+        bool sawLineBreak = false;
+
+        foreach (Segment segment in segments) {
+            if (segment.IsLineBreak) {
+                yield return current;
+                current = new List<Segment>();
+                sawLineBreak = true;
+                continue;
+            }
+
+            current.Add(segment);
+        }
+
+        if (current.Count > 0 || !sawLineBreak) {
+            if (current.Count > 0) {
+                yield return current;
+            }
+        }
+    }
+
+    private static int CountLines(List<Segment> segments) {
+        if (segments.Count == 0) {
+            return 0;
+        }
+
+        int lineBreaks = segments.Count(segment => segment.IsLineBreak);
+        if (lineBreaks == 0) {
+            return 1;
+        }
+
+        return segments[^1].IsLineBreak ? lineBreaks : lineBreaks + 1;
+    }
+
+    private int ResolveLineNumberWidth(int lineCount) {
+        if (LineNumberWidth.HasValue && LineNumberWidth.Value > 0) {
+            return LineNumberWidth.Value;
+        }
+
+        int lastLineNumber = LineNumberStart + Math.Max(0, lineCount - 1);
+        return lastLineNumber.ToString(CultureInfo.InvariantCulture).Length;
     }
 
     /// <summary>
@@ -44,7 +166,7 @@ public sealed class HighlightedText : Renderable {
     /// <param name="border">Border style to use (default: Rounded)</param>
     /// <returns>Panel containing the highlighted text</returns>
     public Panel ToPanel(string? title = null, BoxBorder? border = null) {
-        Panel panel = new(new Rows([.. Renderables]));
+        Panel panel = new(this);
 
         if (!string.IsNullOrEmpty(title)) {
             panel.Header(title);
@@ -67,12 +189,12 @@ public sealed class HighlightedText : Renderable {
     /// </summary>
     /// <param name="padding">Padding to apply</param>
     /// <returns>Padder containing the highlighted text</returns>
-    public Padder WithPadding(Padding padding) => new(new Rows([.. Renderables]), padding);
+    public Padder WithPadding(Padding padding) => new(this, padding);
 
     /// <summary>
     /// Wraps the highlighted text with uniform padding on all sides.
     /// </summary>
     /// <param name="size">Padding size for all sides</param>
     /// <returns>Padder containing the highlighted text</returns>
-    public Padder WithPadding(int size) => new(new Rows([.. Renderables]), new Padding(size));
+    public Padder WithPadding(int size) => new(this, new Padding(size));
 }

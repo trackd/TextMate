@@ -8,11 +8,12 @@ using TextMateSharp.Grammars;
 namespace PSTextMate.Commands;
 
 /// <summary>
-/// Base cmdlet for rendering input using a fixed TextMate language or extension token.
+/// Base cmdlet for rendering input using TextMate language or extension tokens.
 /// </summary>
 public abstract class TextMateCmdletBase : PSCmdlet {
     private readonly List<string> _inputObjectBuffer = [];
     private string? _sourceBaseDirectory;
+    private string? _sourceExtensionHint;
 
     /// <summary>
     /// String content or file path to render with syntax highlighting.
@@ -34,6 +35,12 @@ public abstract class TextMateCmdletBase : PSCmdlet {
     [Parameter]
     public ThemeName Theme { get; set; } = ThemeName.DarkPlus;
 
+    /// <summary>
+    /// When present, render a gutter with line numbers.
+    /// </summary>
+    [Parameter]
+    public SwitchParameter LineNumbers { get; set; }
+
 
     /// <summary>
     /// Fixed language or extension token used for rendering.
@@ -51,6 +58,11 @@ public abstract class TextMateCmdletBase : PSCmdlet {
     protected virtual bool UsesMarkdownBaseDirectory => false;
 
     /// <summary>
+    /// Indicates whether an extension hint should be inferred from pipeline metadata.
+    /// </summary>
+    protected virtual bool UsesExtensionHint => false;
+
+    /// <summary>
     /// Error identifier used for error records.
     /// </summary>
     protected virtual string ErrorId => GetType().Name;
@@ -59,6 +71,21 @@ public abstract class TextMateCmdletBase : PSCmdlet {
     /// Indicates whether alternate rendering should be used.
     /// </summary>
     protected virtual bool UseAlternate => false;
+
+    /// <summary>
+    /// Default language token used when no explicit input is available.
+    /// </summary>
+    protected virtual string? DefaultLanguage => null;
+
+    /// <summary>
+    /// Resolved extension hint from the pipeline input.
+    /// </summary>
+    protected string? SourceExtensionHint => _sourceExtensionHint;
+
+    /// <summary>
+    /// Resolved base directory for markdown rendering.
+    /// </summary>
+    protected string? SourceBaseDirectory => _sourceBaseDirectory;
 
     protected override void ProcessRecord() {
         if (MyInvocation.ExpectingInput) {
@@ -74,8 +101,8 @@ public abstract class TextMateCmdletBase : PSCmdlet {
                 }
             }
             else if (InputObject?.BaseObject is string inputString) {
-                if (UsesMarkdownBaseDirectory) {
-                    EnsureBaseDirectoryFromInput();
+                if (UsesMarkdownBaseDirectory || UsesExtensionHint) {
+                    EnsureSourceHints();
                 }
 
                 _inputObjectBuffer.Add(inputString);
@@ -105,8 +132,8 @@ public abstract class TextMateCmdletBase : PSCmdlet {
                 return;
             }
 
-            if (UsesMarkdownBaseDirectory) {
-                EnsureBaseDirectoryFromInput();
+            if (UsesMarkdownBaseDirectory || UsesExtensionHint) {
+                EnsureSourceHints();
             }
 
             HighlightedText? result = ProcessStringInput();
@@ -127,13 +154,14 @@ public abstract class TextMateCmdletBase : PSCmdlet {
             return null;
         }
 
-        (string token, bool asExtension) = ResolveFixedToken();
+        (string token, bool asExtension) = ResolveTokenForStringInput();
         IRenderable[]? renderables = TextMateProcessor.ProcessLines(lines, Theme, token, isExtension: asExtension, forceAlternate: UseAlternate);
 
         return renderables is null
             ? null
             : new HighlightedText {
-                Renderables = renderables
+                Renderables = renderables,
+                ShowLineNumbers = LineNumbers.IsPresent
             };
     }
 
@@ -148,7 +176,7 @@ public abstract class TextMateCmdletBase : PSCmdlet {
             WriteVerbose($"Set markdown base directory for image resolution: {markdownBaseDir}");
         }
 
-        (string token, bool asExtension) = ResolveFixedToken();
+        (string token, bool asExtension) = ResolveTokenForPathInput(filePath);
         WriteVerbose($"Processing file: {filePath.FullName} with {(asExtension ? "extension" : "language")}: {token}");
 
         string[] lines = File.ReadAllLines(filePath.FullName);
@@ -156,12 +184,21 @@ public abstract class TextMateCmdletBase : PSCmdlet {
 
         if (renderables is not null) {
             yield return new HighlightedText {
-                Renderables = renderables
+                Renderables = renderables,
+                ShowLineNumbers = LineNumbers.IsPresent
             };
         }
     }
 
-    private (string token, bool asExtension) ResolveFixedToken() {
+    protected virtual (string token, bool asExtension) ResolveTokenForStringInput() {
+        return ResolveFixedToken();
+    }
+
+    protected virtual (string token, bool asExtension) ResolveTokenForPathInput(FileInfo filePath) {
+        return ResolveFixedToken();
+    }
+
+    protected (string token, bool asExtension) ResolveFixedToken() {
         if (!FixedTokenIsExtension) {
             return TextMateResolver.ResolveToken(FixedToken);
         }
@@ -170,8 +207,12 @@ public abstract class TextMateCmdletBase : PSCmdlet {
         return (token, true);
     }
 
-    private void EnsureBaseDirectoryFromInput() {
-        if (_sourceBaseDirectory is not null || InputObject is null) {
+    private void EnsureSourceHints() {
+        if (InputObject is null) {
+            return;
+        }
+
+        if (_sourceBaseDirectory is not null && _sourceExtensionHint is not null) {
             return;
         }
 
@@ -182,12 +223,27 @@ public abstract class TextMateCmdletBase : PSCmdlet {
             return;
         }
 
-        string resolvedPath = GetUnresolvedProviderPathFromPSPath(hint);
-        string? baseDir = Path.GetDirectoryName(resolvedPath);
-        if (!string.IsNullOrWhiteSpace(baseDir)) {
-            _sourceBaseDirectory = baseDir;
-            Rendering.ImageRenderer.CurrentMarkdownDirectory = baseDir;
-            WriteVerbose($"Set markdown base directory from input: {baseDir}");
+        if (_sourceExtensionHint is null) {
+            string ext = Path.GetExtension(hint);
+            if (string.IsNullOrWhiteSpace(ext)) {
+                string resolvedHint = GetUnresolvedProviderPathFromPSPath(hint);
+                ext = Path.GetExtension(resolvedHint);
+            }
+
+            if (!string.IsNullOrWhiteSpace(ext)) {
+                _sourceExtensionHint = ext;
+                WriteVerbose($"Detected extension hint from input: {ext}");
+            }
+        }
+
+        if (_sourceBaseDirectory is null) {
+            string resolvedPath = GetUnresolvedProviderPathFromPSPath(hint);
+            string? baseDir = Path.GetDirectoryName(resolvedPath);
+            if (!string.IsNullOrWhiteSpace(baseDir)) {
+                _sourceBaseDirectory = baseDir;
+                Rendering.ImageRenderer.CurrentMarkdownDirectory = baseDir;
+                WriteVerbose($"Set markdown base directory from input: {baseDir}");
+            }
         }
     }
 }

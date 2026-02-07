@@ -82,7 +82,7 @@ public static class ImageRenderer {
             int defaultMaxWidth = maxWidth ?? 80;  // Default to ~80 characters wide for terminal display
             int defaultMaxHeight = maxHeight ?? 30; // Default to ~30 lines high
 
-            if (TryCreateSixelImage(localImagePath, defaultMaxWidth, defaultMaxHeight, out IRenderable? sixelImage) && sixelImage is not null) {
+            if (TryCreateSixelRenderable(localImagePath, defaultMaxWidth, defaultMaxHeight, out IRenderable? sixelImage) && sixelImage is not null) {
                 // Return the sixel image directly. The caller may append an explicit Text.NewLine
                 // so it renders as a separate row (avoids embedding the blank row inside the same widget).
                 return sixelImage;
@@ -135,7 +135,7 @@ public static class ImageRenderer {
             int width = maxWidth ?? 60;  // Default max width for inline images
             int height = maxHeight ?? 20; // Default max height for inline images
 
-            if (TryCreateSixelImage(localImagePath, width, height, out IRenderable? sixelImage) && sixelImage is not null) {
+            if (TryCreateSixelRenderable(localImagePath, width, height, out IRenderable? sixelImage) && sixelImage is not null) {
                 return sixelImage;
             }
             else {
@@ -150,23 +150,78 @@ public static class ImageRenderer {
     }
 
     /// <summary>
-    /// Attempts to create a SixelImage using reflection for forward compatibility.
+    /// Attempts to create a sixel renderable using the newest available implementation.
     /// </summary>
-    /// <param name="imagePath">Path to the image file</param>
-    /// <param name="maxWidth">Maximum width</param>
-    /// <param name="maxHeight">Maximum height</param>
-    /// <param name="result">The created SixelImage, if successful</param>
-    /// <returns>True if SixelImage was successfully created</returns>
-    private static bool TryCreateSixelImage(string imagePath, int? maxWidth, int? maxHeight, out IRenderable? result) {
+    private static bool TryCreateSixelRenderable(string imagePath, int? maxWidth, int? maxHeight, out IRenderable? result) {
+        if (TryCreatePixelImage(imagePath, maxWidth, out result)) {
+            return true;
+        }
+
+        return TryCreateSpectreSixelImage(imagePath, maxWidth, maxHeight, out result);
+    }
+
+    /// <summary>
+    /// Attempts to create a PixelImage from PwshSpectreConsole using reflection.
+    /// </summary>
+    private static bool TryCreatePixelImage(string imagePath, int? maxWidth, out IRenderable? result) {
         result = null;
 
         try {
-            // Try multiple approaches to find SixelImage
+            Type? pixelImageType = Type.GetType("PwshSpectreConsole.PixelImage, PwshSpectreConsole");
+            if (pixelImageType is null) {
+                return false;
+            }
 
-            // First, try the direct approach - SixelImage is in Spectre.Console namespace
+            ConstructorInfo? constructor = pixelImageType.GetConstructor([typeof(string), typeof(bool)]);
+            if (constructor is null) {
+                _lastSixelError = "Constructor not found for PixelImage with (string, bool) parameters";
+                return false;
+            }
+
+            object? pixelInstance;
+            try {
+                pixelInstance = constructor.Invoke([imagePath, false]);
+            }
+            catch (Exception ex) {
+                _lastSixelError = $"Failed to invoke PixelImage constructor: {ex.InnerException?.Message ?? ex.Message}";
+                return false;
+            }
+
+            if (pixelInstance is null) {
+                _lastSixelError = "PixelImage constructor returned null";
+                return false;
+            }
+
+            if (maxWidth.HasValue) {
+                PropertyInfo? maxWidthProperty = pixelImageType.GetProperty("MaxWidth");
+                if (maxWidthProperty?.CanWrite == true) {
+                    maxWidthProperty.SetValue(pixelInstance, maxWidth.Value);
+                }
+            }
+
+            if (pixelInstance is IRenderable renderable) {
+                result = renderable;
+                return true;
+            }
+        }
+        catch (Exception ex) {
+            _lastSixelError = ex.Message;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Attempts to create a Spectre.Console SixelImage using reflection for backward compatibility.
+    /// </summary>
+    private static bool TryCreateSpectreSixelImage(string imagePath, int? maxWidth, int? maxHeight, out IRenderable? result) {
+        result = null;
+
+        try {
+            // Try the direct approach - SixelImage is in Spectre.Console namespace
             // but might be in different assemblies (Spectre.Console vs Spectre.Console.ImageSharp)
             Type? sixelImageType = Type.GetType("Spectre.Console.SixelImage, Spectre.Console.ImageSharp")
-                            ?? Type.GetType("Spectre.Console.SixelImage, Spectre.Console") ?? Type.GetType("PwshSpectreConsole.PixelImage, PwshSpectreConsole");
+                            ?? Type.GetType("Spectre.Console.SixelImage, Spectre.Console");
 
             // If that fails, search through loaded assemblies
             if (sixelImageType is null) {
@@ -207,11 +262,11 @@ public static class ImageRenderer {
             // Create SixelImage instance
             ConstructorInfo? constructor = sixelImageType.GetConstructor([typeof(string), typeof(bool)]);
             if (constructor is null) {
-                _lastSixelError = $"Constructor not found for SixelImage with (string, bool) parameters";
+                _lastSixelError = "Constructor not found for SixelImage with (string, bool) parameters";
                 return false;
             }
 
-            object? sixelInstance = null;
+            object? sixelInstance;
             try {
                 sixelInstance = constructor.Invoke([imagePath, false]); // false = animation disabled
             }
@@ -221,7 +276,7 @@ public static class ImageRenderer {
             }
 
             if (sixelInstance is null) {
-                _lastSixelError = $"SixelImage constructor returned null";
+                _lastSixelError = "SixelImage constructor returned null";
                 return false;
             }
 
