@@ -44,12 +44,13 @@
     <View>
       <Name>Grapheme</Name>
       <ViewSelectedBy>
-        <TypeName>PSTextMate.Helpers.Grapheme+GraphemeMeasurement</TypeName>
+        <TypeName>PSTextMate.Helpers.GraphemeMeasurement</TypeName>
       </ViewSelectedBy>
       <TableControl>
         <TableHeaders>
           <TableColumnHeader>
             <Label>StringLength</Label>
+            <Alignment>Center</Alignment>
           </TableColumnHeader>
           <TableColumnHeader>
             <Label>Cells</Label>

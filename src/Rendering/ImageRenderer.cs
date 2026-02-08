@@ -152,11 +152,8 @@ public static class ImageRenderer {
     /// <summary>
     /// Attempts to create a sixel renderable using the newest available implementation.
     /// </summary>
-    private static bool TryCreateSixelRenderable(string imagePath, int? maxWidth, int? maxHeight, out IRenderable? result) {
-        return TryCreatePixelImage(imagePath, maxWidth, out result)
-            ? true
-            : TryCreateSpectreSixelImage(imagePath, maxWidth, maxHeight, out result);
-    }
+    private static bool TryCreateSixelRenderable(string imagePath, int? maxWidth, int? maxHeight, out IRenderable? result)
+        => TryCreatePixelImage(imagePath, maxWidth, out result) || TryCreateSpectreSixelImage(imagePath, maxWidth, maxHeight, out result);
 
     /// <summary>
     /// Attempts to create a PixelImage from PwshSpectreConsole using reflection.

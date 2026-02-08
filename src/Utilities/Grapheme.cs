@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using PSTextMate.Helpers;
 
 namespace PSTextMate.Helpers;
 
@@ -7,38 +8,36 @@ namespace PSTextMate.Helpers;
 // seems based on https://github.com/microsoft/terminal/blob/main/src/types/CodepointWidthDetector.cpp
 // https://github.com/microsoft/terminal/blob/main/src/types/GlyphWidth.cpp
 
-public static class Grapheme {
-
-    /// <summary>
-    /// grapheme measurement
-    /// </summary>
-    /// <param name="Text">Input string.</param>
-    /// <param name="StringLength">UTF-16 length of the input string.</param>
-    /// <param name="Cells">Number of grapheme cursor movements.</param>
-    /// <param name="Length">Total column width of graphemes.</param>
-    /// <param name="EndOffset">UTF-16 offset where measurement stopped.</param>
-    /// <param name="ContainsVT">String contains VT/OSC/CSI.</param>
-    public readonly struct GraphemeMeasurement {
-        public string Text { get; }
-        public int StringLength => Text.Length;
-        /// CursorMovements
-        public int Cells { get; }
-        /// Columns
-        public int Length { get; }
-        public int EndOffset { get; }
-        public bool HasWideCharacters { get; }
-        public bool? ContainsVT { get; }
-        public GraphemeMeasurement(string input, int cells, int length, int endOffset, bool? containsVT) {
-            Text = input;
-            Cells = cells;
-            Length = length;
-            EndOffset = endOffset;
-            ContainsVT = containsVT;
-            HasWideCharacters = length > cells;
-        }
-        public override string ToString() => $"StringLength: {StringLength}, Cells: {Cells}, Length: {Length}, Wide: {HasWideCharacters}, VT: {ContainsVT}";
+/// <summary>
+/// grapheme measurement
+/// </summary>
+/// <param name="Text">Input string.</param>
+/// <param name="StringLength">UTF-16 length of the input string.</param>
+/// <param name="Cells">Number of grapheme cursor movements.</param>
+/// <param name="Length">Total column width of graphemes.</param>
+/// <param name="EndOffset">UTF-16 offset where measurement stopped.</param>
+/// <param name="ContainsVT">String contains VT/OSC/CSI.</param>
+public readonly struct GraphemeMeasurement {
+    public string Text { get; }
+    public int StringLength => Text.Length;
+    /// CursorMovements
+    public int Cells { get; }
+    /// Columns
+    public int Length { get; }
+    public int EndOffset { get; }
+    public bool HasWideCharacters { get; }
+    public bool? ContainsVT { get; }
+    public GraphemeMeasurement(string input, int cells, int length, int endOffset, bool? containsVT) {
+        Text = input;
+        Cells = cells;
+        Length = length;
+        EndOffset = endOffset;
+        ContainsVT = containsVT;
+        HasWideCharacters = length > cells;
     }
-
+    public override string ToString() => $"StringLength: {StringLength}, Cells: {Cells}, Length: {Length}, Wide: {HasWideCharacters}, VT: {ContainsVT}";
+}
+public static class Grapheme {
     /// <summary>
     /// Measure a string and return combined grapheme results.
     /// </summary>
@@ -530,6 +529,30 @@ public static class Grapheme {
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static int Utf16PrevOrFFFD(string str, int offset, out uint cp) {
+        offset--;
+        uint c = str[offset];
+
+        // Is any surrogate?
+        if ((c & 0xF800) == 0xD800) {
+            uint c2 = c;
+            c = 0xfffd;
+
+            // Is trailing surrogate and not at begin?
+            if ((c2 & 0x400) != 0 && offset != 0) {
+                uint c1 = str[offset - 1];
+                // Is also leading surrogate!
+                if ((c1 & 0xFC00) == 0xD800) {
+                    c = (c1 << 10) - 0x35FDC00 + c2;
+                    offset--;
+                }
+            }
+        }
+
+        cp = c;
+        return offset;
+    }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool TrySkipVTForward(string str, ref int offset) {
         int length = str.Length;
 
@@ -582,6 +605,34 @@ public static class Grapheme {
             default:
                 return false;
         }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static bool TrySkipVTBackward(string str, ref int offset) {
+        int length = str.Length;
+
+        if (offset <= 0 || offset > length) {
+            return false;
+        }
+
+        int scan = offset;
+
+        while (scan > 0) {
+            int start = scan - 1;
+            char c = str[start];
+
+            if (c is '\u001b' or (>= '\u0090' and <= '\u009f')) {
+                int forward = start;
+                if (TrySkipVTForward(str, ref forward) && forward >= offset) {
+                    offset = start;
+                    return true;
+                }
+            }
+
+            scan = start;
+        }
+
+        return false;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -706,6 +757,7 @@ public static class Grapheme {
             int lead = UcdLookup(cp);
 
             do {
+                // Skip VT sequences before reading the next codepoint to keep state aligned.
                 while (offsetTrail < str.Length && TrySkipVTForward(str, ref offsetTrail)) {
                     sawVT = true;
                 }
@@ -721,8 +773,6 @@ public static class Grapheme {
                         break;
                     }
 
-                    offsetTrail = Utf16NextOrFFFD(str, offsetTrail, out cp);
-
                     while (offsetTrail < str.Length && TrySkipVTForward(str, ref offsetTrail)) {
                         sawVT = true;
                     }
@@ -730,6 +780,8 @@ public static class Grapheme {
                     if (offsetTrail >= str.Length) {
                         break;
                     }
+
+                    offsetTrail = Utf16NextOrFFFD(str, offsetTrail, out cp);
 
                     int trail = UcdLookup(cp);
                     state = UcdGraphemeJoins(state, lead, trail);
@@ -756,6 +808,143 @@ public static class Grapheme {
         }
 
         containsVT = sawVT;
+        return new MeasurementResult(offset, cursorMovements, columns);
+    }
+
+    /// <summary>
+    /// MeasureBackward
+    /// </summary>
+    /// <param name="str"></param>
+    /// <param name="offset"></param>
+    /// <param name="maxCursorMovements"></param>
+    /// <param name="maxColumns"></param>
+    /// <returns></returns>
+    public static MeasurementResult MeasureBackward(string str, int offset = 0, int maxCursorMovements = int.MaxValue, int maxColumns = int.MaxValue) {
+        int cursorMovements = 0;
+        int columns = 0;
+
+        if (offset > 0 && maxCursorMovements > 0 && maxColumns > 0) {
+            int offsetLead = Utf16PrevOrFFFD(str, offset, out uint cp);
+            int trail = UcdLookup(cp);
+
+            while (true) {
+                int offsetTrail = offsetLead;
+                int width = 0;
+                uint state = 0;
+
+                while (true) {
+                    width += UcdToCharacterWidth(trail);
+
+                    if (offsetLead <= 0) {
+                        break;
+                    }
+
+                    offsetLead = Utf16PrevOrFFFD(str, offsetLead, out cp);
+                    int lead = UcdLookup(cp);
+                    state = UcdGraphemeJoins(state, lead, trail);
+                    trail = lead;
+
+                    if (UcdGraphemeDone(state)) {
+                        break;
+                    }
+
+                    offsetTrail = offsetLead;
+                }
+
+                width = Math.Min(2, width);
+
+                if (columns + width > maxColumns || cursorMovements + 1 > maxCursorMovements) {
+                    break;
+                }
+
+                offset = offsetTrail;
+                cursorMovements += 1;
+                columns += width;
+
+                if (offset <= 0) {
+                    break;
+                }
+            }
+        }
+
+        return new MeasurementResult(offset, cursorMovements, columns);
+    }
+
+    /// <summary>
+    /// MeasureBackward
+    /// </summary>
+    /// <param name="str"></param>
+    /// <param name="offset"></param>
+    /// <param name="maxCursorMovements"></param>
+    /// <param name="maxColumns"></param>
+    /// <returns></returns>
+    public static MeasurementResult MeasureBackwardVT(string str, int offset = 0, int maxCursorMovements = int.MaxValue, int maxColumns = int.MaxValue) {
+        int cursorMovements = 0;
+        int columns = 0;
+
+        if (offset > 0 && maxCursorMovements > 0 && maxColumns > 0) {
+            while (offset > 0 && TrySkipVTBackward(str, ref offset)) {
+            }
+
+            if (offset <= 0) {
+                return new MeasurementResult(offset, cursorMovements, columns);
+            }
+
+            int offsetLead = Utf16PrevOrFFFD(str, offset, out uint cp);
+            int trail = UcdLookup(cp);
+
+            do {
+                int offsetTrail = offsetLead;
+                int width = 0;
+                uint state = 0;
+
+                while (true) {
+                    width += UcdToCharacterWidth(trail);
+
+                    if (offsetLead <= 0) {
+                        break;
+                    }
+
+                    while (offsetLead > 0 && TrySkipVTBackward(str, ref offsetLead)) {
+                    }
+
+                    if (offsetLead <= 0) {
+                        break;
+                    }
+
+                    offsetLead = Utf16PrevOrFFFD(str, offsetLead, out cp);
+                    int lead = UcdLookup(cp);
+                    state = UcdGraphemeJoins(state, lead, trail);
+                    trail = lead;
+
+                    if (UcdGraphemeDone(state)) {
+                        break;
+                    }
+
+                    offsetTrail = offsetLead;
+                }
+
+                width = Math.Min(2, width);
+
+                if (columns + width > maxColumns || cursorMovements + 1 > maxCursorMovements) {
+                    break;
+                }
+
+                offset = offsetTrail;
+                cursorMovements++;
+                columns += width;
+
+                while (offset > 0 && TrySkipVTBackward(str, ref offset)) {
+                }
+
+                if (offset > 0) {
+                    offsetLead = Utf16PrevOrFFFD(str, offset, out cp);
+                    trail = UcdLookup(cp);
+                }
+            }
+            while (offset > 0);
+        }
+
         return new MeasurementResult(offset, cursorMovements, columns);
     }
     public readonly record struct MeasurementResult(int Offset, int CursorMovements, int Columns) { }

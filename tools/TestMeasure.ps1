@@ -1,3 +1,9 @@
+if (-not (Get-Module PSTextMate)) {
+	# Import-Module (Join-Path $PSScriptRoot 'output' 'PSTextMate.psd1')
+	$Path = Resolve-Path (Join-Path $PSScriptRoot '..')
+	. (Join-Path $Path 'harness.ps1') -Load -Path $Path
+}
+
 $TestStrings = @(
 	'Plain ASCII',
 	"CJK: `u{4E2D}`u{6587}`u{65E5}`u{672C}`u{8A9E}",
@@ -17,9 +23,14 @@ $AnsiTestStrings = @(
 	"VT + Wide: `e[36m`u{4E2D}`u{6587}`e[0m",
 	"OSC title: `e]0;PSTextMate Test`a",
 	"CSI cursor move: start`e[2Cend"
+	'{0}{1}First - {2}{3}Second - {4}{5}{6}Bold' -f $PSStyle.Foreground.Red, $PSStyle.Background.Green, $PSStyle.Foreground.Green, $psstyle.Background.Red, $PSStyle.Blink, $PSStyle.Background.Yellow, $PSStyle.Foreground.BrightCyan
+	'{0}Hello{1}{2}{3}{1}yep!' -f $PSStyle.Foreground.Red, $PSStyle.Reset, $PSStyle.Background.Magenta, $PSStyle.FormatHyperlink('world!', 'https://www.example.com')
+	'{0}Hello{1}{2}{3} https://www.example.com' -f $PSStyle.Foreground.Red, $PSStyle.Reset, $PSStyle.Background.Magenta, $PSStyle.Reset
 )
 
 $TestStrings | Measure-String
+$TestStrings | Measure-String -IgnoreVT
 $AnsiTestStrings| Measure-String
+# $AnsiTestStrings| Measure-String -IgnoreVT
 # @([string[]][System.Text.Rune[]]@(0x1F600..0x1F64F)) | Measure-String
 # @([string[]][char[]]@(@(0xe0b0..0xe0d4) + @(0x2588..0x259b) + @(0x256d..0x2572))) | Measure-String

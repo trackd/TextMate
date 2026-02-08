@@ -1,4 +1,5 @@
 ﻿using System.Management.Automation;
+using System.Runtime.InteropServices;
 using PSTextMate.Helpers;
 
 namespace PSTextMate.Commands;
@@ -6,8 +7,8 @@ namespace PSTextMate.Commands;
 /// <summary>
 /// Cmdlet for measuring grapheme width and cursor movement for a string.
 /// </summary>
-[Cmdlet(VerbsDiagnostic.Measure, "String")]
-[OutputType(typeof(Grapheme.GraphemeMeasurement), typeof(bool), typeof(int))]
+[Cmdlet(VerbsDiagnostic.Measure, "String", DefaultParameterSetName = "Default")]
+[OutputType(typeof(GraphemeMeasurement), typeof(bool), typeof(int))]
 public sealed class MeasureStringCmdlet : PSCmdlet {
     /// <summary>
     /// The input string to measure.
@@ -24,24 +25,33 @@ public sealed class MeasureStringCmdlet : PSCmdlet {
     [Parameter]
     public SwitchParameter IgnoreVT { get; set; }
 
-    [Parameter]
+    [Parameter(
+        ParameterSetName = "Wide"
+    )]
     public SwitchParameter IsWide { get; set; }
 
-    [Parameter]
+    [Parameter(
+        ParameterSetName = "Visible"
+    )]
     public SwitchParameter VisibleLength { get; set; }
     protected override void ProcessRecord() {
         if (InputString is null) {
             return;
         }
-        Grapheme.GraphemeMeasurement measurement = Grapheme.Measure(InputString, !IgnoreVT.IsPresent);
-        if (IsWide) {
-            WriteObject(measurement.HasWideCharacters);
-            return;
+        GraphemeMeasurement measurement = Grapheme.Measure(InputString, !IgnoreVT.IsPresent);
+        switch (ParameterSetName) {
+            case "Wide": {
+                    WriteObject(measurement.HasWideCharacters);
+                    break;
+                }
+            case "Visible": {
+                    WriteObject(measurement.Cells);
+                    break;
+                }
+            default: {
+                    WriteObject(measurement);
+                    break;
+                }
         }
-        if (VisibleLength) {
-            WriteObject(measurement.Cells);
-            return;
-        }
-        WriteObject(measurement);
     }
 }
