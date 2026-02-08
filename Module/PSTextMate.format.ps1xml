@@ -93,14 +93,14 @@
                   if ($_.HasWideCharacters) {
                   '{1}{0}{2}' -f (
                     [char]0xf42e,
-                    "$([char]27)[42m",
+                    "$([char]27)[32m",
                     "$([char]27)[0m"
                   )
                   }
                   else {
                   '{1}{0}{2}' -f (
                     [char]0xEA87,
-                    "$([char]27)[41m",
+                    "$([char]27)[31m",
                     "$([char]27)[0m"
                     )
                   }
@@ -113,21 +113,21 @@
                   if ($null -eq $_.ContainsVT) {
                     return '{1}{0}{2}' -f (
                       [Char]::ConvertFromUtf32(985058),
-                      "$([char]27)[43m",
+                      "$([char]27)[33m",
                       "$([char]27)[0m"
                       )
                   }
                   if ($_.ContainsVT) {
                     '{1}{0}{2}' -f (
                     [char]0xf42e,
-                    "$([char]27)[42m",
+                    "$([char]27)[32m",
                     "$([char]27)[0m"
                     )
                   }
                   else {
                     '{1}{0}{2}' -f (
                     [char]0xEA87,
-                    "$([char]27)[41m",
+                    "$([char]27)[31m",
                     "$([char]27)[0m"
                     )
                   }
