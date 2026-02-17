@@ -12,8 +12,6 @@ This file is for testing all supported markdown features in PSTextMate.
 
 ### Heading 3
 
----
-
 ## Paragraphs and Line Breaks
 
 This is a paragraph with a line break.  
@@ -21,44 +19,37 @@ This should be on a new line.
 
 This is a new paragraph after a blank line.  
 
----
-
 ## Emphasis
 
 *Italic text* and **bold text** and ***bold italic text***.
-
----
 
 ## Links
 
 [GitHub](https://github.com)  
 [Blue styled link](https://example.com)  
 
----
-
 ## Lists
 
 - Unordered item 1
+  - [ ] Incomplete sub-task 1
 - Unordered item 2
   - Nested item
 - Unordered item 3
+  - [x] Completed sub-item 3
 
 1. Ordered item 1
 2. Ordered item 2
    1. Nested ordered item
+      1. three level nest list 2
 3. Ordered item 3
 
 - [x] Completed task
 - [ ] Incomplete task
 
----
-
 ## Blockquote
 
 > This is a blockquote.
 > It can span multiple lines.
-
----
 
 ## Code
 
@@ -75,22 +66,11 @@ Get-ChildItem $PWD
 
 ```csharp
 // C# code block
-public static StringBuilder AppendWithStyle(this StringBuilder builder, Style? style, string? value)
-{
-    value ??= string.Empty;
-    if (style is not null)
-    {
-        return builder.Append('[')
-            .Append(style.ToMarkup())
-            .Append(']')
-            .Append(value.EscapeMarkup())
-            .Append("[/]");
-    }
-    return builder.Append(value);
+public static bool IsSupportedFile(string file) {
+    string ext = Path.GetExtension(file);
+    return TextMateHelper.Extensions?.Contains(ext) == true;
 }
 ```
-
----
 
 ## Table
 
@@ -100,13 +80,9 @@ public static StringBuilder AppendWithStyle(this StringBuilder builder, Style? s
 | Beta    | 2     |
 | Gamma   | 3     |
 
----
-
 ## Images
 
 ![xkcd git](../assets/git_commit.png)
-
----
 
 ## Horizontal Rule
 
@@ -116,21 +92,7 @@ public static StringBuilder AppendWithStyle(this StringBuilder builder, Style? s
 
 <div style="color: red;">This is raw HTML and may not render in all markdown processors.</div>  
 
----
-
 ## Escaped Characters
 
 \*This is not italic\*  
 \# Not a heading  
-
----
-
-## Second Table
-
-| Name    | Text  |
-|---------|-------|
-| Foo     | Bar   |
-| Hello   | World |
-
----
-End of test file.  

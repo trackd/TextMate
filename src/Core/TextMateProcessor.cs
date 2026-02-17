@@ -1,80 +1,55 @@
 using System.Text;
-using PwshSpectreConsole.TextMate.Infrastructure;
-using PwshSpectreConsole.TextMate.Extensions;
+using PSTextMate.Core;
+using PSTextMate.Utilities;
 using Spectre.Console;
 using Spectre.Console.Rendering;
 using TextMateSharp.Grammars;
 using TextMateSharp.Themes;
 
-namespace PwshSpectreConsole.TextMate.Core;
+namespace PSTextMate.Core;
 
 /// <summary>
 /// Main entry point for TextMate processing operations.
 /// Provides high-performance text processing using TextMate grammars and themes.
 /// </summary>
-public static class TextMateProcessor
-{
+public static class TextMateProcessor {
     /// <summary>
-    /// Processes string lines with specified theme and grammar for syntax highlighting.
-    /// This is the unified method that handles all text processing scenarios.
+    /// Processes string lines for code blocks without escaping markup characters.
+    /// This preserves raw source code content for proper syntax highlighting.
     /// </summary>
     /// <param name="lines">Array of text lines to process</param>
     /// <param name="themeName">Theme to apply for styling</param>
     /// <param name="grammarId">Language ID or file extension for grammar selection</param>
     /// <param name="isExtension">True if grammarId is a file extension, false if it's a language ID</param>
     /// <returns>Rendered rows with syntax highlighting, or null if processing fails</returns>
-    /// <exception cref="ArgumentNullException">Thrown when lines array is null</exception>
-    /// <exception cref="UnsupportedGrammarException">Thrown when grammar cannot be found</exception>
-    /// <exception cref="TextMateProcessingException">Thrown when processing encounters an error</exception>
-    public static Rows? ProcessLines(string[] lines, ThemeName themeName, string grammarId, bool isExtension = false)
-    {
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="lines"/> is null</exception>
+    /// <exception cref="InvalidOperationException">Thrown when grammar cannot be found or processing encounters an error</exception>
+    public static IRenderable[]? ProcessLines(string[] lines, ThemeName themeName, string grammarId, bool isExtension, bool forceAlternate = false) {
         ArgumentNullException.ThrowIfNull(lines, nameof(lines));
 
-        if (lines.Length == 0 || lines.AllIsNullOrEmpty())
-        {
+        if (lines.Length == 0 || lines.AllIsNullOrEmpty()) {
             return null;
         }
 
-        return ProcessLines(lines, themeName, grammarId, isExtension, null);
-    }
-
-    public static Rows? ProcessLines(string[] lines, ThemeName themeName, string grammarId, bool isExtension, Action<TokenDebugInfo>? debugCallback)
-    {
-        ArgumentNullException.ThrowIfNull(lines, nameof(lines));
-
-        if (lines.Length == 0 || lines.AllIsNullOrEmpty())
-        {
-            return null;
-        }
-
-        try
-        {
+        try {
             (TextMateSharp.Registry.Registry registry, Theme theme) = CacheManager.GetCachedTheme(themeName);
-            IGrammar? grammar = CacheManager.GetCachedGrammar(registry, grammarId, isExtension);
+            // Resolve grammar using CacheManager which knows how to map language ids and extensions
+            IGrammar? grammar = CacheManager.GetCachedGrammar(registry, grammarId, isExtension) ?? throw new InvalidOperationException(isExtension ? $"Grammar not found for file extension: {grammarId}" : $"Grammar not found for language: {grammarId}");
 
-            if (grammar is null)
-            {
-                string errorMessage = isExtension
-                    ? $"Grammar not found for file extension: {grammarId}"
-                    : $"Grammar not found for language: {grammarId}";
-                throw new InvalidOperationException(errorMessage);
-            }
-
-            // Use optimized rendering based on grammar type
-            return grammar.GetName() == "Markdown"
-                ? MarkdownRenderer.Render(lines, theme, grammar, themeName, debugCallback)
-                : StandardRenderer.Render(lines, theme, grammar, debugCallback);
+            // if alternate it will use TextMate for markdown as well.
+            return grammar.GetName() == "Markdown" && forceAlternate
+                ? StandardRenderer.Render(lines, theme, grammar)
+                : (grammar.GetName() == "Markdown")
+                ? MarkdownRenderer.Render(lines, theme, grammar, themeName)
+                : StandardRenderer.Render(lines, theme, grammar);
         }
-        catch (InvalidOperationException)
-        {
+        catch (InvalidOperationException) {
             throw;
         }
-        catch (ArgumentException ex)
-        {
+        catch (ArgumentException ex) {
             throw new InvalidOperationException($"Argument error processing lines with grammar '{grammarId}': {ex.Message}", ex);
         }
-        catch (Exception ex)
-        {
+        catch (Exception ex) {
             throw new InvalidOperationException($"Unexpected error processing lines with grammar '{grammarId}': {ex.Message}", ex);
         }
     }
@@ -88,17 +63,16 @@ public static class TextMateProcessor
     /// <param name="grammarId">Language ID or file extension for grammar selection</param>
     /// <param name="isExtension">True if grammarId is a file extension, false if it's a language ID</param>
     /// <returns>Rendered rows with syntax highlighting, or null if processing fails</returns>
-    public static Rows? ProcessLinesCodeBlock(string[] lines, ThemeName themeName, string grammarId, bool isExtension = false)
-    {
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="lines"/> is null</exception>
+    /// <exception cref="InvalidOperationException">Thrown when grammar cannot be found or processing encounters an error</exception>
+    public static IRenderable[]? ProcessLinesCodeBlock(string[] lines, ThemeName themeName, string grammarId, bool isExtension = false) {
         ArgumentNullException.ThrowIfNull(lines, nameof(lines));
 
-        try
-        {
+        try {
             (TextMateSharp.Registry.Registry registry, Theme theme) = CacheManager.GetCachedTheme(themeName);
             IGrammar? grammar = CacheManager.GetCachedGrammar(registry, grammarId, isExtension);
 
-            if (grammar is null)
-            {
+            if (grammar is null) {
                 string errorMessage = isExtension
                     ? $"Grammar not found for file extension: {grammarId}"
                     : $"Grammar not found for language: {grammarId}";
@@ -108,16 +82,13 @@ public static class TextMateProcessor
             // Always use StandardRenderer for code blocks, never MarkdownRenderer
             return RenderCodeBlock(lines, theme, grammar);
         }
-        catch (InvalidOperationException)
-        {
+        catch (InvalidOperationException) {
             throw;
         }
-        catch (ArgumentException ex)
-        {
+        catch (ArgumentException ex) {
             throw new InvalidOperationException($"Argument error processing code block with grammar '{grammarId}': {ex.Message}", ex);
         }
-        catch (Exception ex)
-        {
+        catch (Exception ex) {
             throw new InvalidOperationException($"Unexpected error processing code block with grammar '{grammarId}': {ex.Message}", ex);
         }
     }
@@ -125,23 +96,21 @@ public static class TextMateProcessor
     /// <summary>
     /// Renders code block lines without escaping markup characters.
     /// </summary>
-    private static Rows RenderCodeBlock(string[] lines, Theme theme, IGrammar grammar)
-    {
-        var builder = new StringBuilder();
+    private static IRenderable[] RenderCodeBlock(string[] lines, Theme theme, IGrammar grammar) {
         List<IRenderable> rows = new(lines.Length);
         IStateStack? ruleStack = null;
-
-        for (int lineIndex = 0; lineIndex < lines.Length; lineIndex++)
-        {
-            string line = lines[lineIndex];
-            ITokenizeLineResult result = grammar.TokenizeLine(line, ruleStack, TimeSpan.MaxValue);
+        for (int lineIndex = 0; lineIndex < lines.Length; lineIndex++) {
+            if (string.IsNullOrEmpty(lines[lineIndex])) {
+                rows.Add(new Rows(Text.Empty));
+                continue;
+            }
+            var paragraph = new Paragraph();
+            ITokenizeLineResult result = grammar.TokenizeLine(lines[lineIndex], ruleStack, TimeSpan.MaxValue);
             ruleStack = result.RuleStack;
-            TokenProcessor.ProcessTokensBatchNoEscape(result.Tokens, line, theme, builder, null, lineIndex);
-            string lineMarkup = builder.ToString();
-            rows.Add(string.IsNullOrEmpty(lineMarkup) ? Text.Empty : new Markup(lineMarkup));
-            builder.Clear();
+            TokenProcessor.ProcessTokensToParagraph(result.Tokens, lines[lineIndex], theme, paragraph);
+            rows.Add(new Rows(paragraph));
         }
-
-        return new Rows(rows.ToArray());
+        return [.. rows];
     }
+
 }

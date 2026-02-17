@@ -1,10 +1,9 @@
-namespace PwshSpectreConsole.TextMate.Core;
+namespace PSTextMate.Core;
 
 /// <summary>
 /// Maps Markdig markdown element types to TextMate scopes for theme lookup.
 /// </summary>
-internal static class MarkdigTextMateScopeMapper
-{
+internal static class MarkdigTextMateScopeMapper {
     private static readonly Dictionary<string, string[]> BlockScopeMap = new()
     {
         { "Heading1", new[] { "markup.heading.1.markdown", "markup.heading.markdown" } },
@@ -38,29 +37,20 @@ internal static class MarkdigTextMateScopeMapper
         { "LineBreak", new[] { "text.whitespace" } },
     };
 
-    public static string[] GetBlockScopes(string blockType, int headingLevel = 0)
-    {
-        if (blockType == "Heading" && headingLevel > 0 && headingLevel <= 6)
-            return BlockScopeMap[$"Heading{headingLevel}"];
-        if (BlockScopeMap.TryGetValue(blockType, out string[]? scopes))
-            return scopes;
-        return ["text.plain"];
+    public static string[] GetBlockScopes(string blockType, int headingLevel = 0) {
+        return blockType == "Heading" && headingLevel > 0 && headingLevel <= 6
+            ? BlockScopeMap[$"Heading{headingLevel}"]
+            : BlockScopeMap.TryGetValue(blockType, out string[]? scopes) ? scopes : ["text.plain"];
     }
 
-    public static string[] GetInlineScopes(string inlineType, int emphasisLevel = 0)
-    {
-        if (inlineType == "Emphasis")
-        {
-            return emphasisLevel switch
-            {
+    public static string[] GetInlineScopes(string inlineType, int emphasisLevel = 0) {
+        return inlineType == "Emphasis"
+            ? emphasisLevel switch {
                 1 => InlineScopeMap["EmphasisItalic"],
                 2 => InlineScopeMap["EmphasisBold"],
                 3 => InlineScopeMap["EmphasisBoldItalic"],
                 _ => ["text.plain"]
-            };
-        }
-        if (InlineScopeMap.TryGetValue(inlineType, out string[]? scopes))
-            return scopes;
-        return ["text.plain"];
+            }
+            : InlineScopeMap.TryGetValue(inlineType, out string[]? scopes) ? scopes : ["text.plain"];
     }
 }

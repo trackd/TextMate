@@ -1,35 +1,40 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <AssemblyName>PSTextMate</AssemblyName>
-    <TargetFramework>net8.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <Version>0.1.0</Version>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <LangVersion>13.0</LangVersion>
-    <AnalysisMode>Recommended</AnalysisMode>
-    <EnableNETAnalyzers>true</EnableNETAnalyzers>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Markdig.Signed" Version="0.38.0" PrivateAssets="all" />
-    <PackageReference Include="Spectre.Console" Version="0.54.0" PrivateAssets="all" />
-    <PackageReference Include="TextMateSharp" Version="1.0.70" />
-    <PackageReference Include="TextMateSharp.Grammars" Version="1.0.70" />
-    <PackageReference Include="Onigwrap" Version="1.0.8" />
-    <PackageReference Include="System.Management.Automation" Version="7.4" PrivateAssets="all" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Roslynator.Analyzers" Version="4.15.0">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
-    <PackageReference Include="Roslynator.CodeFixes" Version="4.15.0">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
-  </ItemGroup>
-  <ItemGroup>
-    <!-- https://learn.microsoft.com/en-us/nuget/concepts/auditing-packages#excluding-advisories -->
-    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-447r-wph3-92pm" />
-  </ItemGroup>
+    <PropertyGroup>
+        <AssemblyName>PSTextMate</AssemblyName>
+        <TargetFramework>net8.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <Version>0.1.0</Version>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <LangVersion>13.0</LangVersion>
+        <!-- <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies> -->
+        <!-- <RuntimeIdentifiers>win-x64;linux-x64;osx-arm64</RuntimeIdentifiers> -->
+        <!-- <GenerateDocumentationFile>true</GenerateDocumentationFile> -->
+    </PropertyGroup>
+    <PropertyGroup>
+        <EnableNETAnalyzers>true</EnableNETAnalyzers>
+        <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
+        <AnalysisLevel>latest-Recommended</AnalysisLevel>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="Markdig.Signed" Version="0.38.0" PrivateAssets="all" />
+        <PackageReference Include="Spectre.Console" Version="0.54.*" PrivateAssets="all" />
+        <PackageReference Include="TextMateSharp" Version="2.0.3" />
+        <PackageReference Include="TextMateSharp.Grammars" Version="2.0.*" />
+        <PackageReference Include="Onigwrap" Version="1.0.*" />
+        <PackageReference Include="System.Management.Automation" Version="7.4.*" PrivateAssets="all" />
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="Roslynator.Analyzers" Version="4.*">
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+            <PrivateAssets>all</PrivateAssets>
+        </PackageReference>
+        <PackageReference Include="Roslynator.CodeFixes" Version="4.*">
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+            <PrivateAssets>all</PrivateAssets>
+        </PackageReference>
+    </ItemGroup>
+    <ItemGroup>
+        <!-- https://learn.microsoft.com/en-us/nuget/concepts/auditing-packages#excluding-advisories -->
+        <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-447r-wph3-92pm" />
+    </ItemGroup>
 </Project>

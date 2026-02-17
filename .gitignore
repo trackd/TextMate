@@ -4,6 +4,12 @@ src/obj/*
 src/.vs/*
 Module/lib
 debug.md
-output/*
+[Oo]utput/
 */obj/*
 */bin/*
+.github/chatmodes/*
+.github/instructions/*
+.github/prompts/*
+ref/**
+Copilot-Processing.md
+tools/**

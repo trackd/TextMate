@@ -1,7 +1,5 @@
 ﻿# Markdown Rendering Test File
 
-## Code Blocks Test
-
 ### Fenced Code Block with Language
 
 ```csharp
@@ -37,19 +35,10 @@ and multiple lines
 - [x] Another completed task
 - [ ] Another incomplete task
 
-## Headers
-
-# H1 Header
-## H2 Header  
-### H3 Header
-#### H4 Header
-##### H5 Header
-###### H6 Header
-
 ## Paragraphs and Emphasis
 
-This is a **bold** text and this is *italic* text.
-Here's some `inline code` in a paragraph.
+This is a **bold** text and this is *italic* text.  
+Here's some `inline code` in a paragraph.  
 
 ## Tables
 
@@ -60,17 +49,17 @@ Here's some `inline code` in a paragraph.
 
 ## Mixed Content
 
-This paragraph contains **bold**, *italic*, and `code` elements all together.
+This paragraph contains **bold**, *italic*, and `code` elements all together.  
 
 ### Indented Code Block
 
-    This is an indented code block
-    with multiple lines
-    and preserved spacing
+    This is an indented code block  
+    with multiple lines  
+    and preserved spacing  
 
 ## Special Characters and VT Sequences
 
-Text with potential VT sequences: `\x1b[31mRed Text\x1b[0m`
+Text with potential VT sequences: `\x1b[31mRed Text\x1b[0m`  
 
 ## Edge Cases
 

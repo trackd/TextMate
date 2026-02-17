@@ -42,73 +42,101 @@
         </TableControl>
     </View>
     <View>
-      <Name>TextMateDebug</Name>
+      <Name>Grapheme</Name>
       <ViewSelectedBy>
-        <TypeName>PwshSpectreConsole.TextMate.Test+TextMateDebug</TypeName>
+        <TypeName>PSTextMate.Helpers.GraphemeMeasurement</TypeName>
       </ViewSelectedBy>
       <TableControl>
         <TableHeaders>
           <TableColumnHeader>
-            <Label>Index</Label>
+            <Label>StringLength</Label>
+            <Alignment>Center</Alignment>
+          </TableColumnHeader>
+          <TableColumnHeader>
+            <Label>Cells</Label>
+          </TableColumnHeader>
+          <TableColumnHeader>
+            <Label>Length</Label>
+          </TableColumnHeader>
+          <!-- <TableColumnHeader>
+            <Label>EndOffset</Label>
+          </TableColumnHeader> -->
+          <TableColumnHeader>
+            <Label>Wide</Label>
+          </TableColumnHeader>
+          <TableColumnHeader>
+            <Label>VT</Label>
           </TableColumnHeader>
           <TableColumnHeader>
             <Label>Text</Label>
-          </TableColumnHeader>
-          <TableColumnHeader>
-            <Label>Scopes</Label>
           </TableColumnHeader>
         </TableHeaders>
         <TableRowEntries>
           <TableRowEntry>
             <TableColumnItems>
               <TableColumnItem>
+                <PropertyName>StringLength</PropertyName>
+              </TableColumnItem>
+              <TableColumnItem>
+                <PropertyName>Cells</PropertyName>
+              </TableColumnItem>
+              <TableColumnItem>
+                <PropertyName>Length</PropertyName>
+              </TableColumnItem>
+              <!-- <TableColumnItem>
+                <PropertyName>EndOffset</PropertyName>
+              </TableColumnItem> -->
+              <TableColumnItem>
+                <!-- <PropertyName>HasWideCharacters</PropertyName> -->
                 <ScriptBlock>
-                  return 'Line {0}, Index {1}' -f $_.LineIndex, ($_.StartIndex, $_.EndIndex -join '-')
-                  </ScriptBlock>
+                  # HasWideCharacters
+                  if ($_.HasWideCharacters) {
+                  '{1}{0}{2}' -f (
+                    [char]0xf42e,
+                    "$([char]27)[32m",
+                    "$([char]27)[0m"
+                  )
+                  }
+                  else {
+                  '{1}{0}{2}' -f (
+                    [char]0xEA87,
+                    "$([char]27)[31m",
+                    "$([char]27)[0m"
+                    )
+                  }
+                </ScriptBlock>
+              </TableColumnItem>
+              <TableColumnItem>
+                <!-- <PropertyName>ContainsVT</PropertyName> -->
+                <ScriptBlock>
+                  # ContainsVT
+                  if ($null -eq $_.ContainsVT) {
+                    return '{1}{0}{2}' -f (
+                      [Char]::ConvertFromUtf32(985058),
+                      "$([char]27)[33m",
+                      "$([char]27)[0m"
+                      )
+                  }
+                  if ($_.ContainsVT) {
+                    '{1}{0}{2}' -f (
+                    [char]0xf42e,
+                    "$([char]27)[32m",
+                    "$([char]27)[0m"
+                    )
+                  }
+                  else {
+                    '{1}{0}{2}' -f (
+                    [char]0xEA87,
+                    "$([char]27)[31m",
+                    "$([char]27)[0m"
+                    )
+                  }
+                </ScriptBlock>
               </TableColumnItem>
               <TableColumnItem>
                 <PropertyName>Text</PropertyName>
               </TableColumnItem>
-              <TableColumnItem>
-                <ScriptBlock>
-                    return $_.Scopes -join ', '
-                  </ScriptBlock>
-              </TableColumnItem>
-            </TableColumnItems>
-          </TableRowEntry>
-        </TableRowEntries>
-      </TableControl>
-    </View>
-    <View>
-      <Name>TextMateDebug</Name>
-      <ViewSelectedBy>
-        <TypeName>PwshSpectreConsole.TextMate.Core.TokenDebugInfo</TypeName>
-      </ViewSelectedBy>
-      <TableControl>
-        <TableHeaders>
-          <TableColumnHeader>
-            <Label>Text</Label>
-          </TableColumnHeader>
-          <TableColumnHeader>
-            <Label>Style</Label>
-          </TableColumnHeader>
-        </TableHeaders>
-        <TableRowEntries>
-          <TableRowEntry>
-            <TableColumnItems>
-              <TableColumnItem>
-                <PropertyName>Text</PropertyName>
-              </TableColumnItem>
-              <TableColumnItem>
-                <ScriptBlock>
-                  return 'fg: {0}, bg: {1}, deco: {2}, link: {3}' -f (
-                    $_.Style.Foreground.ToMarkup(),
-                    $_.Style.Background.ToMarkup(),
-                    $_.Style.Decoration,
-                    $_.Style.Link)
-                  </ScriptBlock>
-              </TableColumnItem>
-            </TableColumnItems>
+              </TableColumnItems>
           </TableRowEntry>
         </TableRowEntries>
       </TableControl>
