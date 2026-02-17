@@ -29,32 +29,24 @@ task Clean {
     New-Item -Path $folders.OutputPath -ItemType Directory -Force | Out-Null
 }
 
+
 task Build {
     if (-not (Test-Path $folders.CsprojPath)) {
         Write-Warning 'C# project not found, skipping Build'
         return
     }
-    try {
-        Push-Location $folders.SourcePath
-
-        # exec { dotnet publish $folders.CsprojPath --configuration $Configuration --nologo --verbosity minimal --output $folders.DestinationPath }
-        exec { dotnet publish $folders.CsprojPath --configuration $Configuration --nologo --verbosity minimal --output $folders.TempLib }
-        if ($LASTEXITCODE -ne 0) {
-            throw "Build failed with exit code $LASTEXITCODE"
-        }
-        New-Item -Path $folders.outputPath -ItemType Directory -Force | Out-Null
-        New-Item -Path $folders.DestinationPath -ItemType Directory -Force | Out-Null
-        Get-ChildItem -Path (Join-Path $folders.TempLib 'runtimes' 'win-x64' 'native') -Filter *.dll | Move-Item -Destination $folders.DestinationPath -Force
-        Get-ChildItem -Path (Join-Path $folders.TempLib 'runtimes' 'osx-arm64' 'native') -Filter *.dylib | Move-Item -Destination $folders.DestinationPath -Force
-        Get-ChildItem -Path (Join-Path $folders.TempLib 'runtimes' 'linux-x64' 'native') -Filter *.so | Copy-Item -Destination $folders.DestinationPath -Force
-        Move-Item (Join-Path $folders.TempLib 'PSTextMate.dll') -Destination $folders.OutputPath -Force
-        Get-ChildItem "$($folders.TempLib)/*.dll" | Move-Item -Destination $folders.DestinationPath -Force
-        if (Test-Path -Path $folders.TempLib -PathType Container) {
-            Remove-Item -Path $folders.TempLib -Recurse -Force -ErrorAction 'Ignore'
-        }
+    exec { dotnet publish $folders.CsprojPath --configuration $Configuration --nologo --verbosity minimal --output $folders.TempLib }
+    $null = New-Item -Path $folders.outputPath -ItemType Directory -Force
+    $rids = @('win-x64', 'osx-arm64', 'linux-x64','linux-arm64','win-arm64')
+    foreach ($rid in $rids) {
+        $ridDest = Join-Path $folders.DestinationPath $rid
+        $null = New-Item -Path $ridDest -ItemType Directory -Force
+        $nativePath = Join-Path $folders.TempLib 'runtimes' $rid 'native'
+        Get-ChildItem -Path $nativePath -File | Move-Item -Destination $ridDest -Force
     }
-    finally {
-        Pop-Location
+    Get-ChildItem -Path $folders.TempLib -File | Move-Item -Destination $folders.DestinationPath -Force
+    if (Test-Path -Path $folders.TempLib -PathType Container) {
+        Remove-Item -Path $folders.TempLib -Recurse -Force -ErrorAction 'Ignore'
     }
 }
 
@@ -85,6 +77,12 @@ task GenerateHelp -if (-not $SkipHelp) {
         return
     }
 
+    if (-Not (Get-Module PwshSpectreConsole -ListAvailable)) {
+        # just temporarily while im refactoring the PwshSpectreConsole module.
+        $ParentPath = Split-Path $folders.ProjectRoot -Parent
+        Import-Module (Join-Path $ParentPath 'PwshSpectreConsole' 'output' 'PwshSpectreConsole.psd1')
+    }
+
     Import-Module $modulePath -Force
 
     $helpOutputPath = Join-Path $folders.OutputPath 'en-US'
@@ -111,8 +109,12 @@ task Test -if (-not $SkipTests) {
         Write-Warning "Test directory not found at: $($folders.TestPath)"
         return
     }
-    $ParentPath = Split-Path $folders.ProjectRoot -Parent
-    Import-Module (Join-Path $ParentPath 'PwshSpectreConsole' 'output' 'PwshSpectreConsole.psd1')
+
+    if (-not (Get-Module PwshSpectreConsole -ListAvailable)) {
+        # just temporarily while im refactoring the PwshSpectreConsole module.
+        $ParentPath = Split-Path $folders.ProjectRoot -Parent
+        Import-Module (Join-Path $ParentPath 'PwshSpectreConsole' 'output' 'PwshSpectreConsole.psd1')
+    }
 
     Import-Module (Join-Path $folders.OutputPath 'PSTextMate.psd1') -ErrorAction Stop
     Import-Module (Join-Path $folders.TestPath 'testhelper.psm1') -ErrorAction Stop
@@ -124,9 +126,10 @@ task Test -if (-not $SkipTests) {
     $pesterConfig.Debug.WriteDebugMessages = $false
     Invoke-Pester -Configuration $pesterConfig
 }
+
 task CleanAfter {
-    if ($script:config.DestinationPath -and (Test-Path $script:config.DestinationPath)) {
-        Get-ChildItem $script:config.DestinationPath -File | Where-Object { $_.Extension -in '.pdb', '.json' } | Remove-Item -Force -ErrorAction Ignore
+    if ($script:folders.DestinationPath -and (Test-Path $script:folders.DestinationPath)) {
+        Get-ChildItem $script:folders.DestinationPath -File -Recurse | Where-Object { $_.Extension -in '.pdb', '.json' } | Remove-Item -Force -ErrorAction Ignore
     }
 }
 

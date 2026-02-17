@@ -8,7 +8,8 @@ namespace PSTextMate.Commands;
 /// Cmdlet for testing TextMate support for languages, extensions, and files.
 /// Provides validation functionality to check compatibility before processing.
 /// </summary>
-[Cmdlet(VerbsDiagnostic.Test, "SupportedTextMate", DefaultParameterSetName = "File")]
+[OutputType(typeof(bool))]
+[Cmdlet(VerbsDiagnostic.Test, "SupportedTextMate", DefaultParameterSetName = "FileSet")]
 public sealed class TestSupportedTextMateCmdlet : PSCmdlet {
     /// <summary>
     /// File extension to test for support (e.g., '.ps1').

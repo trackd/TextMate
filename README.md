@@ -1,70 +1,77 @@
 # PSTextMate
 
-This modules allows you to render content in the console using TextMate.  
-see below table for supported grammars and builtin themes.  
+PSTextMate delivers syntax-aware highlighting for PowerShell on top of TextMate grammars. It exposes a focused set of cmdlets that emit tokenized, theme-styled `HighlightedText` renderables you can write with PwshSpectreConsole or feed into any Spectre-based pipeline. Helper cmdlets make it easy to discover grammars and validate support for files, extensions, or language IDs before formatting.
 
-the module is meant to be paired with PwshSpectreConsole.  
+What it does
 
-this is still in alpha stage, so expect breaking changes.  
+- Highlights source text using TextMate grammars such as PowerShell, C#, Markdown, and Python.
+- Returns `HighlightedText` renderables that implement Spectre.Console's contract, so they can be written through PwshSpectreConsole or other Spectre hosts.
+- Provides discovery and testing helpers for installed grammars, extensions, or language IDs.
+- Does inline Sixel images in markdown
 
-todo: add custom grammars, add custom themes.  
+## Cmdlets
 
-## libraries
+| Cmdlet | Purpose |
+|--------|---------|
+| [Format-CSharp](docs/en-us/Format-CSharp.md) | Highlight C# source |
+| [Format-Markdown](docs/en-us/Format-Markdown.md) | Highlight Markdown content |
+| [Format-PowerShell](docs/en-us/Format-PowerShell.md) | Highlight PowerShell code |
+| [Show-TextMate](docs/en-us/Show-TextMate.md) | Render text with an inferred or explicit language. |
+| [Get-SupportedTextMate](docs/en-us/Get-SupportedTextMate.md) | List available grammars and file extensions. |
+| [Test-SupportedTextMate](docs/en-us/Test-SupportedTextMate.md) | Check support for a file, extension, or language ID. |
 
-[TextMateSharp](https://github.com/danipen/TextMateSharp)  
-[PwshSpectreConsole](https://github.com/ShaunLawrie/PwshSpectreConsole)  
-[SpectreConsole](https://github.com/spectreconsole/spectre.console)  
+## Examples
 
-## Grammars and Themes
+```powershell
+# highlight a C# snippet
+"public class C { void M() {} }" | Format-CSharp
 
-| grammars      | themes            |
-|---------------|-------------------|
-| asciidoc      | Abbys             |
-| bat           | Dark              |
-| clojure       | DarkPlus          |
-| coffeescript  | DimmedMonokai     |
-| cpp           | KimbieDark        |
-| csharp        | Light             |
-| css           | LightPlus         |
-| dart          | Monokai           |
-| diff          | QuietLight        |
-| docker        | Red               |
-| fsharp        | SolarizedDark     |
-| git           | SolarizedLight    |
-| go            | TomorrowNightBlue |
-| groovy        | HighContrastLight |
-| handlebars    | HighContrastDark  |
-| hlsl          |                   |
-| html          |                   |
-| ini           |                   |
-| java          |                   |
-| javascript    |                   |
-| json          |                   |
-| julia         |                   |
-| latex         |                   |
-| less          |                   |
-| log           |                   |
-| lua           |                   |
-| make          |                   |
-| markdown      |                   |
-| markdown-math |                   |
-| objective-c   |                   |
-| pascal        |                   |
-| perl          |                   |
-| php           |                   |
-| powershell    |                   |
-| pug           |                   |
-| python        |                   |
-| r             |                   |
-| razor         |                   |
-| ruby          |                   |
-| rust          |                   |
-| scss          |                   |
-| shaderlab     |                   |
-| shellscript   |                   |
-| sql           |                   |
-| swift         |                   |
-| typescript    |                   |
-| vb            |                   |
-| xml           |                   |
-| yaml          |                   |
+# render a Markdown file with a theme
+Get-Content README.md -Raw | Format-Markdown -Theme SolarizedLight
+
+# list supported grammars
+Get-SupportedTextMate
+```
+
+## Installation
+
+```powershell
+Install-Module PSTextMate
+```
+
+### Prerequisites
+
+- **PowerShell**: 7.4
+
+### Building from Source
+
+1. Clone this repository
+2. Open a terminal in the project directory
+3. Build the project:
+
+```powershell
+& .\build.ps1
+```
+
+1. Import the module:
+
+```powershell
+Import-Module .\output\PSTextMate.psd1
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Add tests for new functionality
+4. Update documentation as needed
+5. Submit a pull request
+
+## Dependencies
+
+- [TextMateSharp](https://github.com/danipen/TextMateSharp)  
+  - [OnigWrap](https://github.com/aikawayataro/Onigwrap)
+- [PwshSpectreConsole](https://github.com/ShaunLawrie/PwshSpectreConsole)  
+  - [SpectreConsole](https://github.com/spectreconsole/spectre.console)  
+
+---

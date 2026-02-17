@@ -1,5 +1,5 @@
 @{
-    RootModule           = 'PSTextMate.dll'
+    RootModule           = 'lib/PSTextMate.dll'
     ModuleVersion        = '0.1.0'
     GUID                 = 'a6490f8a-1f53-44f2-899c-bf66b9c6e608'
     Author               = 'trackd'
@@ -14,21 +14,15 @@
         'Format-CSharp'
         'Format-Markdown'
         'Format-PowerShell'
-        'Measure-String'
     )
     AliasesToExport      = @(
         'fcs'
         'fmd'
         'fps'
-        'st'
+        'stm'
         'Show-Code'
     )
-    RequiredAssemblies   = @(
-        'lib/Onigwrap.dll'
-        'lib/TextMateSharp.dll'
-        'lib/TextMateSharp.Grammars.dll'
-        'Markdig.Signed.dll'
-    )
+    RequiredAssemblies   = @()
     FormatsToProcess     = 'PSTextMate.format.ps1xml'
     RequiredModules      = @(
         @{

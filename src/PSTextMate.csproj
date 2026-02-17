@@ -6,7 +6,7 @@
         <Version>0.1.0</Version>
         <ImplicitUsings>enable</ImplicitUsings>
         <LangVersion>13.0</LangVersion>
-        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+        <!-- <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies> -->
         <!-- <RuntimeIdentifiers>win-x64;linux-x64;osx-arm64</RuntimeIdentifiers> -->
         <!-- <GenerateDocumentationFile>true</GenerateDocumentationFile> -->
     </PropertyGroup>
@@ -21,7 +21,7 @@
         <PackageReference Include="TextMateSharp" Version="2.0.3" />
         <PackageReference Include="TextMateSharp.Grammars" Version="2.0.*" />
         <PackageReference Include="Onigwrap" Version="1.0.*" />
-        <PackageReference Include="System.Management.Automation" Version="7.4" PrivateAssets="all" />
+        <PackageReference Include="System.Management.Automation" Version="7.4.*" PrivateAssets="all" />
     </ItemGroup>
     <ItemGroup>
         <PackageReference Include="Roslynator.Analyzers" Version="4.*">
@@ -37,17 +37,4 @@
         <!-- https://learn.microsoft.com/en-us/nuget/concepts/auditing-packages#excluding-advisories -->
         <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-447r-wph3-92pm" />
     </ItemGroup>
-
-        <!-- After publish, copy native runtime libraries directly into PublishDir (simple layout) -->
-        <!-- <Target Name="FlattenNativeRuntimes" AfterTargets="Publish">
-            <ItemGroup>
-                <NativeRuntimeFiles Include="$(PublishDir)runtimes\**\native\*.*" />
-            </ItemGroup>
-            <Message Text="Copying native runtime files to $(PublishDir)" Importance="Normal" Condition=" '@(NativeRuntimeFiles)' != '' "/>
-            <MakeDir Directories="$(PublishDir)" Condition="!Exists('$(PublishDir)')" />
-            <Copy SourceFiles="@(NativeRuntimeFiles)"
-                    DestinationFiles="@(NativeRuntimeFiles->'$(PublishDir)%(Filename)%(Extension)')"
-                    SkipUnchangedFiles="true"
-                    Condition=" '@(NativeRuntimeFiles)' != '' " />
-        </Target> -->
 </Project>

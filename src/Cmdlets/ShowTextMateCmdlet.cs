@@ -11,7 +11,7 @@ namespace PSTextMate.Commands;
 /// Supports both string input and file processing with theme customization.
 /// </summary>
 [Cmdlet(VerbsCommon.Show, "TextMate", DefaultParameterSetName = "Default")]
-[Alias("st", "Show-Code")]
+[Alias("stm", "Show-Code")]
 [OutputType(typeof(HighlightedText))]
 public sealed class ShowTextMateCmdlet : TextMateCmdletBase {
     /// <summary>
