@@ -38,10 +38,11 @@ internal static class TableRenderer {
             return null;
 
         // Add headers if present
-        (bool isHeader, List<TableCellContent> cells) headerRow = allRows.FirstOrDefault(r => r.isHeader);
-        if (headerRow.cells?.Count > 0) {
-            for (int i = 0; i < headerRow.cells.Count; i++) {
-                TableCellContent cell = headerRow.cells[i];
+        int headerRowIndex = allRows.FindIndex(r => r.isHeader);
+        if (headerRowIndex >= 0 && allRows[headerRowIndex].cells.Count > 0) {
+            List<TableCellContent> headerCells = allRows[headerRowIndex].cells;
+            for (int i = 0; i < headerCells.Count; i++) {
+                TableCellContent cell = headerCells[i];
                 // Use constructor to set header text; this is the most compatible way
                 var column = new TableColumn(cell.Text);
                 // Apply alignment if Markdig specified one for the column
@@ -58,10 +59,10 @@ internal static class TableRenderer {
         }
         else {
             // No explicit headers, use first row as headers
-            (bool isHeader, List<TableCellContent> cells) = allRows.FirstOrDefault();
-            if (cells?.Count > 0) {
-                for (int i = 0; i < cells.Count; i++) {
-                    TableCellContent cell = cells[i];
+            List<TableCellContent> firstRowCells = allRows[0].cells;
+            if (firstRowCells.Count > 0) {
+                for (int i = 0; i < firstRowCells.Count; i++) {
+                    TableCellContent cell = firstRowCells[i];
                     var column = new TableColumn(cell.Text);
                     if (i < table.ColumnDefinitions.Count) {
                         column.Alignment = table.ColumnDefinitions[i].Alignment switch {
@@ -78,10 +79,10 @@ internal static class TableRenderer {
         }
 
         // Add data rows
-        foreach ((bool isHeader, List<TableCellContent>? cells) in allRows.Where(r => !r.isHeader)) {
-            if (cells?.Count > 0) {
+        foreach ((bool isHeader, List<TableCellContent> cells) in allRows.Where(r => !r.isHeader)) {
+            if (cells.Count > 0) {
                 var rowCells = new List<IRenderable>();
-                foreach (TableCellContent? cell in cells) {
+                foreach (TableCellContent cell in cells) {
                     Style cellStyle = GetCellStyle(theme);
                     rowCells.Add(new Text(cell.Text, cellStyle));
                 }

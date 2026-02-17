@@ -18,7 +18,7 @@ function _GetSpectreRenderable {
         $writer.ToString()
     }
     finally {
-        $writer.Dispose()
+        ${writer}?.Dispose()
     }
 }
 filter _EscapeAnsi {

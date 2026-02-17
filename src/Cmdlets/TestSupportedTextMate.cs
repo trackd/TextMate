@@ -1,5 +1,5 @@
-﻿using System.Management.Automation;
-using System.Runtime.InteropServices;
+﻿using System.IO;
+using System.Management.Automation;
 using TextMateSharp.Grammars;
 
 namespace PSTextMate.Commands;
@@ -47,9 +47,11 @@ public sealed class TestSupportedTextMateCmdlet : PSCmdlet {
     protected override void EndProcessing() {
         switch (ParameterSetName) {
             case "FileSet":
-                FileInfo filePath = new(GetUnresolvedProviderPathFromPSPath(File));
+                FileInfo filePath = new(GetUnresolvedProviderPathFromPSPath(File!));
                 if (!filePath.Exists) {
-                    WriteError(new ErrorRecord(null, "TestSupportedTextMateCmdlet", ErrorCategory.ObjectNotFound, File));
+                    var exception = new FileNotFoundException($"File not found: {filePath.FullName}", filePath.FullName);
+                    WriteError(new ErrorRecord(exception, nameof(TestSupportedTextMateCmdlet), ErrorCategory.ObjectNotFound, filePath.FullName));
+                    return;
                 }
                 WriteObject(TextMateExtensions.IsSupportedFile(filePath.FullName));
                 break;

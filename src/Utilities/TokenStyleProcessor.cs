@@ -56,7 +56,7 @@ internal static class TokenStyleProcessor {
         ITextMateStyler styler) {
         var result = new List<IRenderable>();
 
-        foreach ((IToken[]? tokens, string? line) in tokenizedLines) {
+        foreach ((IToken[] tokens, string line) in tokenizedLines) {
             // Process each line
             IRenderable[] lineRenderables = ProcessTokens(tokens, line, theme, styler);
 
