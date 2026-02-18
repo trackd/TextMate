@@ -36,7 +36,7 @@ public static class ImageRenderer {
             _lastSixelError = null;
 
             // Check if the image format is likely supported
-            if (!ImageFile.IsLikelySupportedImageFormat(imageUrl)) {
+            if (!ImageFile.IsLikelySupportedImageFormat(imageUrl, CurrentMarkdownDirectory)) {
                 _lastImageError = $"Unsupported image format: {imageUrl}";
                 return CreateImageFallback(altText, imageUrl);
             }
@@ -111,7 +111,7 @@ public static class ImageRenderer {
     public static IRenderable RenderImageInline(string altText, string imageUrl, int? maxWidth = null, int? maxHeight = null) {
         try {
             // Check if the image format is likely supported
-            if (!ImageFile.IsLikelySupportedImageFormat(imageUrl)) {
+            if (!ImageFile.IsLikelySupportedImageFormat(imageUrl, CurrentMarkdownDirectory)) {
                 return CreateImageFallbackInline(altText, imageUrl);
             }
 

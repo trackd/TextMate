@@ -19,10 +19,12 @@ internal static class ImageBlockRenderer {
     public static IRenderable? RenderImageBlock(
         string altText,
         string imageUrl,
-        ImageRenderMode renderMode = ImageRenderMode.Direct) {
+        ImageRenderMode renderMode = ImageRenderMode.Direct,
+        int? maxWidth = null,
+        int? maxHeight = null) {
 
         // Get the base image renderable (either SixelImage or fallback)
-        IRenderable? imageRenderable = ImageRenderer.RenderImage(altText, imageUrl);
+        IRenderable? imageRenderable = ImageRenderer.RenderImage(altText, imageUrl, maxWidth, maxHeight);
 
         if (imageRenderable is null) return null;
 
@@ -49,13 +51,13 @@ internal static class ImageBlockRenderer {
             ImageRenderMode.WithPadding
                 => new Padder(imageRenderable, new Padding(1, 0)),
             ImageRenderMode.SideCaption
-                => RenderImageWithSideCaption(altText, imageUrl, altText),
+                => RenderImageWithSideCaption(altText, imageUrl, altText, maxWidth, maxHeight),
             ImageRenderMode.VerticalCaption
-                => RenderImageWithVerticalCaption(altText, imageUrl, altText),
+                => RenderImageWithVerticalCaption(altText, imageUrl, altText, maxWidth, maxHeight),
             ImageRenderMode.Grid
-                => RenderImageInGrid(altText, imageUrl, topCaption: altText),
+                => RenderImageInGrid(altText, imageUrl, topCaption: altText, maxWidth: maxWidth, maxHeight: maxHeight),
             ImageRenderMode.TableCell
-                => RenderImageInTable(altText, imageUrl, altText),
+                => RenderImageInTable(altText, imageUrl, altText, maxWidth, maxHeight),
             _ => imageRenderable
         };
     }
@@ -67,9 +69,11 @@ internal static class ImageBlockRenderer {
     public static IRenderable? RenderImageWithSideCaption(
         string altText,
         string imageUrl,
-        string caption) {
+        string caption,
+        int? maxWidth = null,
+        int? maxHeight = null) {
 
-        IRenderable? imageRenderable = ImageRenderer.RenderImage(altText, imageUrl);
+        IRenderable? imageRenderable = ImageRenderer.RenderImage(altText, imageUrl, maxWidth, maxHeight);
         if (imageRenderable is null) {
             return null;
         }
@@ -92,9 +96,11 @@ internal static class ImageBlockRenderer {
     public static IRenderable? RenderImageWithVerticalCaption(
         string altText,
         string imageUrl,
-        string caption) {
+        string caption,
+        int? maxWidth = null,
+        int? maxHeight = null) {
 
-        IRenderable? imageRenderable = ImageRenderer.RenderImage(altText, imageUrl);
+        IRenderable? imageRenderable = ImageRenderer.RenderImage(altText, imageUrl, maxWidth, maxHeight);
         if (imageRenderable is null) {
             return null;
         }
@@ -117,9 +123,11 @@ internal static class ImageBlockRenderer {
         string altText,
         string imageUrl,
         string? topCaption = null,
-        string? bottomCaption = null) {
+        string? bottomCaption = null,
+        int? maxWidth = null,
+        int? maxHeight = null) {
 
-        IRenderable? imageRenderable = ImageRenderer.RenderImage(altText, imageUrl);
+        IRenderable? imageRenderable = ImageRenderer.RenderImage(altText, imageUrl, maxWidth, maxHeight);
         if (imageRenderable is null) {
             return null;
         }
@@ -144,9 +152,11 @@ internal static class ImageBlockRenderer {
     public static Table RenderImageInTable(
         string altText,
         string imageUrl,
-        string caption) {
+        string caption,
+        int? maxWidth = null,
+        int? maxHeight = null) {
 
-        IRenderable? imageRenderable = ImageRenderer.RenderImage(altText, imageUrl);
+        IRenderable? imageRenderable = ImageRenderer.RenderImage(altText, imageUrl, maxWidth, maxHeight);
 
         Table table = new Table()
             .AddColumn("Image")

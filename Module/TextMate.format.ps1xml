@@ -1,0 +1,45 @@
+﻿<Configuration>
+  <ViewDefinitions>
+    <View>
+      <Name>TextMateGrammar</Name>
+      <ViewSelectedBy>
+        <TypeName>TextMateSharp.Grammars.Language</TypeName>
+        </ViewSelectedBy>
+        <TableControl>
+          <TableHeaders>
+            <TableColumnHeader>
+              <Label>Id</Label>
+              <Width>20</Width>
+            </TableColumnHeader>
+            <TableColumnHeader>
+              <Label>Extensions</Label>
+              <Width>45</Width>
+            </TableColumnHeader>
+            <TableColumnHeader>
+              <Label>Aliases</Label>
+              <Width>45</Width>
+            </TableColumnHeader>
+          </TableHeaders>
+          <TableRowEntries>
+            <TableRowEntry>
+              <TableColumnItems>
+                <TableColumnItem>
+                  <PropertyName>Id</PropertyName>
+                </TableColumnItem>
+                <TableColumnItem>
+                  <ScriptBlock>
+                    $_.Extensions -join ', '
+                  </ScriptBlock>
+                </TableColumnItem>
+                <TableColumnItem>
+                  <ScriptBlock>
+                    $_.Aliases -join ', '
+                  </ScriptBlock>
+                </TableColumnItem>
+              </TableColumnItems>
+            </TableRowEntry>
+          </TableRowEntries>
+        </TableControl>
+    </View>
+  </ViewDefinitions>
+</Configuration>

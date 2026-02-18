@@ -1,9 +1,9 @@
 ---
 document type: cmdlet
-external help file: PSTextMate.dll-Help.xml
+external help file: TextMate.dll-Help.xml
 HelpUri: ''
 Locale: en-US
-Module Name: PSTextMate
+Module Name: TextMate
 ms.date: 02-17-2026
 PlatyPS schema version: 2024-05-01
 title: Get-SupportedTextMate
@@ -77,8 +77,8 @@ Emits `Language` objects from TextMateSharp describing the grammar, scope name, 
 
 ## NOTES
 
-The returned objects can be used by `Show-TextMate` or other consumers to determine which grammar token to apply for a given file.
+The returned objects can be used by `Format-TextMate` or other consumers to determine which grammar token to apply for a given file.
 
 ## RELATED LINKS
 
-See `Show-TextMate` for rendering and `Test-SupportedTextMate` for support checks.
+See `Format-TextMate` for rendering and `Test-SupportedTextMate` for support checks.

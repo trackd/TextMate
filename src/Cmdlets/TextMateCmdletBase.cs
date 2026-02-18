@@ -39,7 +39,6 @@ public abstract class TextMateCmdletBase : PSCmdlet {
     [Parameter]
     public SwitchParameter LineNumbers { get; set; }
 
-
     /// <summary>
     /// Fixed language or extension token used for rendering.
     /// </summary>
@@ -90,7 +89,6 @@ public abstract class TextMateCmdletBase : PSCmdlet {
             if (InputObject?.BaseObject is FileInfo file) {
                 try {
                     foreach (HighlightedText result in ProcessPathInput(file)) {
-
                         WriteObject(result);
                     }
                 }
@@ -114,7 +112,6 @@ public abstract class TextMateCmdletBase : PSCmdlet {
 
             try {
                 foreach (HighlightedText result in ProcessPathInput(file)) {
-
                     WriteObject(result);
                 }
             }

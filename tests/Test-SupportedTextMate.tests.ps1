@@ -1,8 +1,9 @@
 BeforeAll {
-    if (-not (Get-Module 'PSTextMate')) {
-        Import-Module (Join-Path $PSScriptRoot '..' 'output' 'PSTextMate.psd1') -ErrorAction Stop
+    if (-not (Get-Module 'TextMate')) {
+        Import-Module (Join-Path $PSScriptRoot '..' 'output' 'TextMate.psd1') -ErrorAction Stop
     }
 }
+
 
 Describe 'Test-SupportedTextMate' {
     It 'Recognizes powershell language' {
@@ -14,7 +15,7 @@ Describe 'Test-SupportedTextMate' {
     }
 
     It 'Recognizes an existing file as supported' {
-        $testFile = Join-Path $PSScriptRoot 'Show-TextMate.tests.ps1'
+        $testFile = Join-Path $PSScriptRoot 'Format-TextMate.tests.ps1'
         Test-SupportedTextMate -File $testFile | Should -BeTrue
     }
 }

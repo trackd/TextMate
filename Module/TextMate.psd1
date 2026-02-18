@@ -8,22 +8,22 @@
     PowerShellVersion    = '7.4'
     CompatiblePSEditions = 'Core'
     CmdletsToExport      = @(
-        'Show-TextMate'
-        'Test-SupportedTextMate'
-        'Get-SupportedTextMate'
+        'Format-TextMate'
         'Format-CSharp'
         'Format-Markdown'
         'Format-PowerShell'
+        'Test-SupportedTextMate'
+        'Get-SupportedTextMate'
     )
     AliasesToExport      = @(
         'fcs'
         'fmd'
         'fps'
-        'stm'
-        'Show-Code'
+        'ftm'
+        'Show-TextMate'
     )
     RequiredAssemblies   = @()
-    FormatsToProcess     = 'PSTextMate.format.ps1xml'
+    FormatsToProcess     = 'TextMate.format.ps1xml'
     RequiredModules      = @(
         @{
             ModuleName     = 'PwshSpectreConsole'

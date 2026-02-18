@@ -6,9 +6,6 @@
         <Version>0.1.0</Version>
         <ImplicitUsings>enable</ImplicitUsings>
         <LangVersion>13.0</LangVersion>
-        <!-- <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies> -->
-        <!-- <RuntimeIdentifiers>win-x64;linux-x64;osx-arm64</RuntimeIdentifiers> -->
-        <!-- <GenerateDocumentationFile>true</GenerateDocumentationFile> -->
     </PropertyGroup>
     <PropertyGroup>
         <EnableNETAnalyzers>true</EnableNETAnalyzers>

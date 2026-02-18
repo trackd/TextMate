@@ -5,7 +5,7 @@ param(
     [switch]$SkipHelp,
     [switch]$SkipTests,
     [Switch]$BuildAndTestOnly,
-    [string] $Task
+    [string]$Task
 )
 
 $ErrorActionPreference = 'Stop'
@@ -14,7 +14,7 @@ $buildparams = @{
     Configuration = $Configuration
     SkipHelp      = $SkipHelp.IsPresent
     SkipTests     = $SkipTests.IsPresent
-    File          = Join-Path $PSScriptRoot 'PSTextMate.build.ps1'
+    File          = (Get-Item (Join-Path $PSScriptRoot '*.build.ps1')).FullName
     Task          = 'All'
     Result        = 'Result'
     Safe          = $true
@@ -24,8 +24,8 @@ if (-not (Get-Module -ListAvailable -Name InvokeBuild)) {
 }
 Import-Module InvokeBuild -ErrorAction Stop
 
-if ($task) {
-    $buildparams.Task = $task
+if ($Task) {
+    $buildparams.Task = $Task
 }
 elseif ($BuildAndTestOnly) {
     $buildparams.Task = 'BuildAndTest'

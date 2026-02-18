@@ -1,15 +1,15 @@
 ---
 document type: cmdlet
-external help file: PSTextMate.dll-Help.xml
+external help file: TextMate.dll-Help.xml
 HelpUri: ''
 Locale: en-US
-Module Name: PSTextMate
+Module Name: TextMate
 ms.date: 02-17-2026
 PlatyPS schema version: 2024-05-01
-title: Show-TextMate
+title: Format-TextMate
 ---
 
-# Show-TextMate
+# Format-TextMate
 
 ## SYNOPSIS
 
@@ -20,18 +20,18 @@ Displays syntax-highlighted text using TextMate grammars. Accepts strings or fil
 ### Default (Default)
 
 ```
-Show-TextMate [-InputObject] <psobject> [-Language <string>] [-Alternate] [-Theme <ThemeName>]
+Format-TextMate [-InputObject] <psobject> [-Language <string>] [-Alternate] [-Theme <ThemeName>]
  [-LineNumbers] [<CommonParameters>]
 ```
 
 ## ALIASES
 
 This cmdlet has the following aliases,
-  stm, Show-Code
+  ftm, Show-TextMate
 
 ## DESCRIPTION
 
-Show-TextMate renders textual input using an appropriate TextMate grammar.
+Format-TextMate renders textual input using an appropriate TextMate grammar.
 When `-Language` is provided it forces that language;
 when omitted the cmdlet may infer language from file extension or default to `powershell`.
 Use `-Alternate` to force the standard renderer for Markdown files.
@@ -43,7 +43,7 @@ Use `-Alternate` to force the standard renderer for Markdown files.
 Example: highlight a snippet with an explicit language
 
 ```
-"print('hello')" | Show-TextMate -Language python
+"print('hello')" | Format-TextMate -Language python
 ```
 
 ### Example 2
@@ -51,7 +51,7 @@ Example: highlight a snippet with an explicit language
 Example: render a file and let the cmdlet infer language from extension
 
 ```
-Show-TextMate -InputObject (Get-Content scripts\deploy.ps1 -Raw)
+Format-TextMate -InputObject (Get-Content scripts\deploy.ps1 -Raw)
 ```
 
 ### Example 3
@@ -59,7 +59,7 @@ Show-TextMate -InputObject (Get-Content scripts\deploy.ps1 -Raw)
 Example: preview a Markdown file
 
 ```
-Get-Content README.md -Raw | Show-TextMate -Theme SolarizedDark
+Get-Content README.md -Raw | Format-TextMate -Theme SolarizedDark
 ```
 
 ## PARAMETERS
@@ -184,7 +184,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ### PSObject
 
-Accepts textual input or objects containing text; commonly used with `Get-Content -Raw` or pipeline strings.
+Accepts textual input or objects containing text; commonly used with `Get-Content -Raw` or pipeline strings or FileInfo objects.
 
 ## OUTPUTS
 

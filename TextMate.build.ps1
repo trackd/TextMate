@@ -116,7 +116,7 @@ task Test -if (-not $SkipTests) {
         Import-Module (Join-Path $ParentPath 'PwshSpectreConsole' 'output' 'PwshSpectreConsole.psd1')
     }
 
-    Import-Module (Join-Path $folders.OutputPath 'PSTextMate.psd1') -ErrorAction Stop
+    Import-Module (Join-Path $folders.OutputPath ($folders.ModuleName + '.psd1')) -ErrorAction Stop
     Import-Module (Join-Path $folders.TestPath 'testhelper.psm1') -ErrorAction Stop
 
     $pesterConfig = New-PesterConfiguration

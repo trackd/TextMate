@@ -1,9 +1,9 @@
 ---
 document type: cmdlet
-external help file: PSTextMate.dll-Help.xml
+external help file: TextMate.dll-Help.xml
 HelpUri: ''
 Locale: en-US
-Module Name: PSTextMate
+Module Name: TextMate
 ms.date: 02-17-2026
 PlatyPS schema version: 2024-05-01
 title: Test-SupportedTextMate
@@ -161,4 +161,4 @@ Use `Get-SupportedTextMate` to discover available language IDs and their extensi
 
 ## RELATED LINKS
 
-See `Get-SupportedTextMate` and `Show-TextMate` for discovery and rendering workflows.
+See `Get-SupportedTextMate` and `Format-TextMate` for discovery and rendering workflows.

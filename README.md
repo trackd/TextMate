@@ -1,6 +1,6 @@
-# PSTextMate
+# TextMate
 
-PSTextMate delivers syntax-aware highlighting for PowerShell on top of TextMate grammars. It exposes a focused set of cmdlets that emit tokenized, theme-styled `HighlightedText` renderables you can write with PwshSpectreConsole or feed into any Spectre-based pipeline. Helper cmdlets make it easy to discover grammars and validate support for files, extensions, or language IDs before formatting.
+TextMate delivers syntax-aware highlighting for PowerShell on top of TextMate grammars. It exposes a focused set of cmdlets that emit tokenized, theme-styled `HighlightedText` renderables you can write with PwshSpectreConsole or feed into any Spectre-based pipeline. Helper cmdlets make it easy to discover grammars and validate support for files, extensions, or language IDs before formatting.
 
 What it does
 
@@ -13,12 +13,16 @@ What it does
 
 | Cmdlet | Purpose |
 |--------|---------|
+| [Format-TextMate](docs/en-us/Format-TextMate.md) | Render text with an inferred or explicit language. |
 | [Format-CSharp](docs/en-us/Format-CSharp.md) | Highlight C# source |
 | [Format-Markdown](docs/en-us/Format-Markdown.md) | Highlight Markdown content |
 | [Format-PowerShell](docs/en-us/Format-PowerShell.md) | Highlight PowerShell code |
-| [Show-TextMate](docs/en-us/Show-TextMate.md) | Render text with an inferred or explicit language. |
 | [Get-SupportedTextMate](docs/en-us/Get-SupportedTextMate.md) | List available grammars and file extensions. |
 | [Test-SupportedTextMate](docs/en-us/Test-SupportedTextMate.md) | Check support for a file, extension, or language ID. |
+
+```note
+Format-CSharp/Markdown/Powershell is just sugar for Format-TextMate -Language CSharp/PowerShell/Markdown
+```
 
 ## Examples
 
@@ -36,7 +40,7 @@ Get-SupportedTextMate
 ## Installation
 
 ```powershell
-Install-Module PSTextMate
+Install-Module TextMate
 ```
 
 ### Prerequisites
@@ -56,7 +60,7 @@ Install-Module PSTextMate
 1. Import the module:
 
 ```powershell
-Import-Module .\output\PSTextMate.psd1
+Import-Module .\output\TextMate.psd1
 ```
 
 ## Contributing
@@ -75,3 +79,5 @@ Import-Module .\output\PSTextMate.psd1
   - [SpectreConsole](https://github.com/spectreconsole/spectre.console)  
 
 ---
+
+[About TextMate](https://en.wikipedia.org/wiki/TextMate)

@@ -10,10 +10,10 @@ namespace PSTextMate.Commands;
 /// Cmdlet for displaying syntax-highlighted text using TextMate grammars.
 /// Supports both string input and file processing with theme customization.
 /// </summary>
-[Cmdlet(VerbsCommon.Show, "TextMate", DefaultParameterSetName = "Default")]
-[Alias("stm", "Show-Code")]
+[Cmdlet(VerbsCommon.Format, "TextMate", DefaultParameterSetName = "Default")]
+[Alias("Show-TextMate", "ftm")]
 [OutputType(typeof(HighlightedText))]
-public sealed class ShowTextMateCmdlet : TextMateCmdletBase {
+public sealed class FormatTextMateCmdlet : TextMateCmdletBase {
     /// <summary>
     /// TextMate language ID for syntax highlighting (e.g., 'powershell', 'csharp', 'python').
     /// If not specified, detected from file extension (for files) or defaults to 'powershell' (for strings).

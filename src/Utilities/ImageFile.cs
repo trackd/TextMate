@@ -15,6 +15,7 @@ namespace PSTextMate.Utilities;
 /// </summary>
 internal static partial class ImageFile {
     private static readonly HttpClient HttpClient = new();
+    private static readonly string[] SupportedExtensions = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"];
 
     [GeneratedRegex(@"^data:image\/(?<type>[a-zA-Z]+);base64,(?<data>[A-Za-z0-9+/=]+)$", RegexOptions.Compiled)]
     private static partial Regex Base64Regex();
@@ -42,9 +43,9 @@ internal static partial class ImageFile {
             return await DownloadImageToTempFileAsync(uri);
         }
 
-        // Check if it's a local file path
-        if (File.Exists(imageSource)) {
-            return imageSource;
+        // Check if it's a local file path (including extensionless forms that map to known image extensions)
+        if (TryResolveFilePath(imageSource, out string? directPath)) {
+            return directPath;
         }
 
         // Try to resolve relative paths
@@ -55,7 +56,30 @@ internal static partial class ImageFile {
         // Debug: For troubleshooting, we can add logging here if needed
         // System.Diagnostics.Debug.WriteLine($"Resolving '{imageSource}' with base '{resolveBasePath}' -> '{fullPath}' (exists: {File.Exists(fullPath)})");
 
-        return File.Exists(fullPath) ? fullPath : null;
+        return TryResolveFilePath(fullPath, out string? resolvedPath) ? resolvedPath : null;
+    }
+
+    private static bool TryResolveFilePath(string inputPath, out string? resolvedPath) {
+        resolvedPath = null;
+
+        if (File.Exists(inputPath)) {
+            resolvedPath = inputPath;
+            return true;
+        }
+
+        if (Path.HasExtension(inputPath)) {
+            return false;
+        }
+
+        foreach (string extension in SupportedExtensions) {
+            string candidate = inputPath + extension;
+            if (File.Exists(candidate)) {
+                resolvedPath = candidate;
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -155,17 +179,29 @@ internal static partial class ImageFile {
     /// </summary>
     /// <param name="imageSource">The image source to check</param>
     /// <returns>True if the image source is likely supported</returns>
-    public static bool IsLikelySupportedImageFormat(string imageSource) {
+    public static bool IsLikelySupportedImageFormat(string imageSource, string? baseDirectory = null) {
         if (string.IsNullOrWhiteSpace(imageSource)) {
             return false;
         }
 
         // Check for supported extensions
         string extension = Path.GetExtension(imageSource).ToLowerInvariant();
-        string[] supportedExtensions = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"];
 
-        if (supportedExtensions.Contains(extension)) {
+        if (SupportedExtensions.Contains(extension)) {
             return true;
+        }
+
+        // Extensionless local/relative paths are supported if they resolve to existing files.
+        if (string.IsNullOrEmpty(extension) && TryResolveFilePath(imageSource, out _)) {
+            return true;
+        }
+
+        // If a base directory is provided, try resolving there (useful for markdown-relative paths).
+        if (!string.IsNullOrWhiteSpace(baseDirectory)) {
+            string combinedPath = Path.GetFullPath(Path.Combine(baseDirectory, imageSource));
+            if (TryResolveFilePath(combinedPath, out _)) {
+                return true;
+            }
         }
 
         // Check for base64 data URI with supported format
@@ -180,7 +216,7 @@ internal static partial class ImageFile {
         if (Uri.TryCreate(imageSource, UriKind.Absolute, out Uri? uri) &&
             (uri.Scheme == "http" || uri.Scheme == "https")) {
             string urlExtension = Path.GetExtension(uri.LocalPath).ToLowerInvariant();
-            return supportedExtensions.Contains(urlExtension);
+            return SupportedExtensions.Contains(urlExtension);
         }
 
         return false;

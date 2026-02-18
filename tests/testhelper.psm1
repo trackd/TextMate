@@ -1,16 +1,19 @@
+using namespace System.Management.Automation;
+using namespace Spectre.Console;
+using namespace Spectre.Console.Rendering;
+
 function _GetSpectreRenderable {
     param(
         [Parameter(Mandatory)]
-        [object] $RenderableObject,
+        [Renderable] $RenderableObject,
         [switch] $EscapeAnsi
     )
     try {
-        [Spectre.Console.Rendering.Renderable]$RenderableObject = $RenderableObject
         $writer = [System.IO.StringWriter]::new()
-        $output = [Spectre.Console.AnsiConsoleOutput]::new($writer)
-        $settings = [Spectre.Console.AnsiConsoleSettings]::new()
+        $output = [AnsiConsoleOutput]::new($writer)
+        $settings = [AnsiConsoleSettings]::new()
         $settings.Out = $output
-        $console = [Spectre.Console.AnsiConsole]::Create($settings)
+        $console = [AnsiConsole]::Create($settings)
         $console.Write($RenderableObject)
         if ($EscapeAnsi) {
             return $writer.ToString() | _EscapeAnsi
@@ -22,7 +25,7 @@ function _GetSpectreRenderable {
     }
 }
 filter _EscapeAnsi {
-    [System.Management.Automation.Host.PSHostUserInterface]::GetOutputString($_, $false)
+    [Host.PSHostUserInterface]::GetOutputString($_, $false)
 }
 
 Export-ModuleMember -Function _GetSpectreRenderable, _EscapeAnsi
