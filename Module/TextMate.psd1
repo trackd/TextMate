@@ -36,7 +36,7 @@
             Tags       = 'Windows', 'Linux', 'TextMate', 'Markdown', 'Syntax Highlighting'
             LicenseUri = 'https://github.com/trackd/TextMate/blob/main/LICENSE'
             ProjectUri = 'https://github.com/trackd/TextMate'
-            IconUri    = 'https://raw.githubusercontent.com/trackd/TextMate/main/assets/texmatelogo.png'
+            IconUri    = 'https://raw.githubusercontent.com/trackd/TextMate/main/assets/logo.png'
         }
     }
     HelpInfoURI            = 'https://github.com/trackd/TextMate/tree/main/docs/en-us'

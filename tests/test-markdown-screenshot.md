@@ -29,6 +29,6 @@ function Write-Greeting {
 
 *Italic text* and **bold text** and ***bold italic text***.
 
-<img src="../assets/texmatelogo.png" width="20" alt="logo">
+<img src="../assets/logo.png" width="20" alt="logo">
 
 *Inline Sixel*
