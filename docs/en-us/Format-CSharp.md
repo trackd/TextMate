@@ -1,12 +1,8 @@
 ---
-document type: cmdlet
-external help file: TextMate.dll-Help.xml
-HelpUri: ''
-Locale: en-US
+external help file: PSTextMate.dll-Help.xml
 Module Name: TextMate
-ms.date: 02-17-2026
-PlatyPS schema version: 2024-05-01
-title: Format-CSharp
+online version: https://github.com/trackd/TextMate/blob/main/docs/en-us
+schema: 2.0.0
 ---
 
 # Format-CSharp

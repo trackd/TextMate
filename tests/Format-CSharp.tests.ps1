@@ -32,4 +32,9 @@ Describe 'Format-CSharp' {
             Remove-Item -Force -ErrorAction SilentlyContinue $temp
         }
     }
+    It 'Should have Help and examples' {
+        $help = Get-Help Format-CSharp -Full
+        $help.Synopsis | Should -Not -BeNullOrEmpty
+        $help.examples.example.Count | Should -BeGreaterThan 1
+    }
 }

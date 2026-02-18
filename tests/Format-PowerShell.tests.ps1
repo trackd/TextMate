@@ -32,4 +32,9 @@ Describe 'Format-PowerShell' {
             Remove-Item -Force -ErrorAction SilentlyContinue $filename
         }
     }
+    It 'Should have Help and examples' {
+        $help = Get-Help Format-PowerShell -Full
+        $help.Synopsis | Should -Not -BeNullOrEmpty
+        $help.examples.example.Count | Should -BeGreaterThan 1
+    }
 }

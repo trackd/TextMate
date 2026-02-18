@@ -1,12 +1,8 @@
 ---
-document type: cmdlet
-external help file: TextMate.dll-Help.xml
-HelpUri: ''
-Locale: en-US
+external help file: PSTextMate.dll-Help.xml
 Module Name: TextMate
-ms.date: 02-17-2026
-PlatyPS schema version: 2024-05-01
-title: Format-PowerShell
+online version: https://github.com/trackd/TextMate/blob/main/docs/en-us
+schema: 2.0.0
 ---
 
 # Format-PowerShell
@@ -34,25 +30,19 @@ Format-PowerShell highlights PowerShell source and script files. Input can be pr
 
 ## EXAMPLES
 
-### Example 1
-
-Example: highlight a short PowerShell snippet
+### Example 1: Highlight a short PowerShell snippet
 
 ```
 'Get-Process | Where-Object { $_.CPU -gt 1 }' | Format-PowerShell
 ```
 
-### Example 2
-
-Example: highlight a script file with line numbers
+### Example 2: Highlight a script file with line numbers
 
 ```
 Get-Content .\scripts\deploy.ps1 -Raw | Format-PowerShell -LineNumbers
 ```
 
-### Example 3
-
-Example: Pipe FileInfo object and render with theme.
+### Example 3: Pipe FileInfo object and render with theme
 
 ```
 Get-ChildItem .\scripts\*.ps1 | Format-PowerShell -Theme Monokai
@@ -136,7 +126,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## INPUTS
 
-### System.Management.Automation.PSObject
+### PSObject
 
 Accepts textual input representing PowerShell source.
 

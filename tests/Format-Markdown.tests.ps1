@@ -49,4 +49,9 @@ Describe 'Format-Markdown' {
         $rendered | Should -Match '🖼️\s+Image:\s+logo width'
         $rendered | Should -Not -Match '<img\b'
     }
+    It 'Should have Help and examples' {
+        $help = Get-Help Format-Markdown -Full
+        $help.Synopsis | Should -Not -BeNullOrEmpty
+        $help.examples.example.Count | Should -BeGreaterThan 1
+    }
 }

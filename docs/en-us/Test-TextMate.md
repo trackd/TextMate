@@ -1,15 +1,11 @@
 ---
-document type: cmdlet
-external help file: TextMate.dll-Help.xml
-HelpUri: ''
-Locale: en-US
+external help file: PSTextMate.dll-Help.xml
 Module Name: TextMate
-ms.date: 02-17-2026
-PlatyPS schema version: 2024-05-01
-title: Test-SupportedTextMate
+online version: https://github.com/trackd/TextMate/blob/main/docs/en-us
+schema: 2.0.0
 ---
 
-# Test-SupportedTextMate
+# Test-TextMate
 
 ## SYNOPSIS
 
@@ -20,19 +16,19 @@ Tests whether a language, extension, or file is supported by the module's TextMa
 ### FileSet (Default)
 
 ```
-Test-SupportedTextMate -File <string> [<CommonParameters>]
+Test-TextMate -File <string> [<CommonParameters>]
 ```
 
 ### ExtensionSet
 
 ```
-Test-SupportedTextMate -Extension <string> [<CommonParameters>]
+Test-TextMate -Extension <string> [<CommonParameters>]
 ```
 
 ### LanguageSet
 
 ```
-Test-SupportedTextMate -Language <string> [<CommonParameters>]
+Test-TextMate -Language <string> [<CommonParameters>]
 ```
 
 ## ALIASES
@@ -42,7 +38,7 @@ This cmdlet has the following aliases,
 
 ## DESCRIPTION
 
-Test-SupportedTextMate verifies support for TextMate languages and extensions.
+Test-TextMate verifies support for TextMate languages and extensions.
 Use the `-File` parameter to check a specific file path, `-Extension` to verify a file extension, or `-Language` to test a language identifier.
 The cmdlet returns `true` or `false`
 
@@ -53,7 +49,7 @@ The cmdlet returns `true` or `false`
 Example: test a file path for support
 
 ```
-Test-SupportedTextMate -File .\src\Program.cs
+Test-TextMate -File .\src\Program.cs
 ```
 
 ### Example 2
@@ -61,7 +57,7 @@ Test-SupportedTextMate -File .\src\Program.cs
 Example: test by extension
 
 ```
-Test-SupportedTextMate -Extension .ps1
+Test-TextMate -Extension .ps1
 ```
 
 ### Example 3
@@ -69,7 +65,7 @@ Test-SupportedTextMate -Extension .ps1
 Example: test by language identifier
 
 ```
-Test-SupportedTextMate -Language powershell
+Test-TextMate -Language powershell
 ```
 
 ## PARAMETERS
@@ -157,8 +153,8 @@ Returns `bool` results for support checks. In error cases or file-not-found scen
 
 ## NOTES
 
-Use `Get-SupportedTextMate` to discover available language IDs and their extensions before calling this cmdlet.
+Use `Get-TextMate` to discover available language IDs and their extensions before calling this cmdlet.
 
 ## RELATED LINKS
 
-See `Get-SupportedTextMate` and `Format-TextMate` for discovery and rendering workflows.
+See `Get-TextMate` and `Format-TextMate` for discovery and rendering workflows.

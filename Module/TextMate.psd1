@@ -13,8 +13,8 @@
         'Format-CSharp'
         'Format-Markdown'
         'Format-PowerShell'
-        'Test-SupportedTextMate'
-        'Get-SupportedTextMate'
+        'Test-TextMate'
+        'Get-TextMateGrammar'
     )
     AliasesToExport      = @(
         'fcs'

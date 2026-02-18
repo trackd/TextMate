@@ -2,10 +2,6 @@ BeforeAll {
     if (-not (Get-Module 'TextMate')) {
         Import-Module (Join-Path $PSScriptRoot '..' 'output' 'TextMate.psd1') -ErrorAction Stop
     }
-}
-
-
-BeforeAll {
     $psString = @'
 function Foo-Bar {
     param([string]$Name)
@@ -36,5 +32,10 @@ Describe 'Format-TextMate' {
         $rendered = _GetSpectreRenderable -RenderableObject $out -EscapeAnsi
         $rendered | Should -Match 'Markdown Test File'
         $rendered | Should -Match 'Path.GetExtension'
+    }
+    It 'Should have Help and examples' {
+        $help = Get-Help Format-TextMate -Full
+        $help.Synopsis | Should -Not -BeNullOrEmpty
+        $help.examples.example.Count | Should -BeGreaterThan 1
     }
 }

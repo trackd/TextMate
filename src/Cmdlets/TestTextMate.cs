@@ -9,8 +9,8 @@ namespace PSTextMate.Commands;
 /// Provides validation functionality to check compatibility before processing.
 /// </summary>
 [OutputType(typeof(bool))]
-[Cmdlet(VerbsDiagnostic.Test, "SupportedTextMate", DefaultParameterSetName = "FileSet")]
-public sealed class TestSupportedTextMateCmdlet : PSCmdlet {
+[Cmdlet(VerbsDiagnostic.Test, "TextMate", DefaultParameterSetName = "FileSet")]
+public sealed class TestTextMateCmdlet : PSCmdlet {
     /// <summary>
     /// File extension to test for support (e.g., '.ps1').
     /// </summary>
@@ -50,7 +50,7 @@ public sealed class TestSupportedTextMateCmdlet : PSCmdlet {
                 FileInfo filePath = new(GetUnresolvedProviderPathFromPSPath(File!));
                 if (!filePath.Exists) {
                     var exception = new FileNotFoundException($"File not found: {filePath.FullName}", filePath.FullName);
-                    WriteError(new ErrorRecord(exception, nameof(TestSupportedTextMateCmdlet), ErrorCategory.ObjectNotFound, filePath.FullName));
+                    WriteError(new ErrorRecord(exception, nameof(TestTextMateCmdlet), ErrorCategory.ObjectNotFound, filePath.FullName));
                     return;
                 }
                 WriteObject(TextMateExtensions.IsSupportedFile(filePath.FullName));

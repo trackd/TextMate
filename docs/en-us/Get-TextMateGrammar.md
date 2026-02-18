@@ -1,15 +1,11 @@
 ---
-document type: cmdlet
-external help file: TextMate.dll-Help.xml
-HelpUri: ''
-Locale: en-US
+external help file: PSTextMate.dll-Help.xml
 Module Name: TextMate
-ms.date: 02-17-2026
-PlatyPS schema version: 2024-05-01
-title: Get-SupportedTextMate
+online version: https://github.com/trackd/TextMate/blob/main/docs/en-us
+schema: 2.0.0
 ---
 
-# Get-SupportedTextMate
+# Get-TextMateGrammar
 
 ## SYNOPSIS
 
@@ -20,7 +16,7 @@ Retrieves a list of supported TextMate languages and grammar metadata available 
 ### (All)
 
 ```
-Get-SupportedTextMate [<CommonParameters>]
+Get-TextMateGrammar [<CommonParameters>]
 ```
 
 ## ALIASES
@@ -30,7 +26,7 @@ This cmdlet has the following aliases,
 
 ## DESCRIPTION
 
-Get-SupportedTextMate returns detailed `TextMateSharp.Grammars.Language` objects describing available grammars, file extensions, scopes, and other metadata. Useful for tooling that needs to map file types to TextMate language IDs.
+Get-TextMateGrammar returns detailed `TextMateSharp.Grammars.Language` objects describing available grammars, file extensions, scopes, and other metadata. Useful for tooling that needs to map file types to TextMate language IDs.
 
 ## EXAMPLES
 
@@ -39,7 +35,7 @@ Get-SupportedTextMate returns detailed `TextMateSharp.Grammars.Language` objects
 Example: list all supported languages
 
 ```
-Get-SupportedTextMate
+Get-TextMateGrammar
 ```
 
 ### Example 2
@@ -47,7 +43,7 @@ Get-SupportedTextMate
 Example: show language names and extensions
 
 ```
-Get-SupportedTextMate | Select-Object Name, Extensions
+Get-TextMateGrammar | Select-Object Name, Extensions
 ```
 
 ### Example 3
@@ -55,7 +51,7 @@ Get-SupportedTextMate | Select-Object Name, Extensions
 Example: find languages supporting .cs files
 
 ```
-Get-SupportedTextMate | Where-Object { $_.Extensions -contains '.cs' }
+Get-TextMateGrammar | Where-Object { $_.Extensions -contains '.cs' }
 ```
 
 ## PARAMETERS
@@ -81,4 +77,4 @@ The returned objects can be used by `Format-TextMate` or other consumers to dete
 
 ## RELATED LINKS
 
-See `Format-TextMate` for rendering and `Test-SupportedTextMate` for support checks.
+See `Format-TextMate` for rendering and `Test-TextMateGrammar` for support checks.

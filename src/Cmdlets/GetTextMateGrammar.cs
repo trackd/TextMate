@@ -8,8 +8,8 @@ namespace PSTextMate.Commands;
 /// Returns detailed information about available grammars and extensions.
 /// </summary>
 [OutputType(typeof(Language))]
-[Cmdlet(VerbsCommon.Get, "SupportedTextMate")]
-public sealed class GetSupportedTextMateCmdlet : PSCmdlet {
+[Cmdlet(VerbsCommon.Get, "TextMateGrammar")]
+public sealed class GetTextMateGrammarCmdlet : PSCmdlet {
     /// <summary>
     /// Finalizes processing and outputs all supported languages.
     /// </summary>
