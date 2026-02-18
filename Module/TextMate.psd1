@@ -1,10 +1,11 @@
 @{
     RootModule           = 'lib/PSTextMate.dll'
     ModuleVersion        = '0.1.0'
-    GUID                 = 'a6490f8a-1f53-44f2-899c-bf66b9c6e608'
+    GUID                 = 'fe78d2cb-2418-4308-9309-a0850e504cd6'
     Author               = 'trackd'
     CompanyName          = 'trackd'
     Copyright            = '(c) trackd. All rights reserved.'
+    Description          = 'A PowerShell module for syntax highlighting using TextMate grammars. Using PwshSpectreConsole for rendering.'
     PowerShellVersion    = '7.4'
     CompatiblePSEditions = 'Core'
     CmdletsToExport      = @(
@@ -22,7 +23,6 @@
         'ftm'
         'Show-TextMate'
     )
-    RequiredAssemblies   = @()
     FormatsToProcess     = 'TextMate.format.ps1xml'
     RequiredModules      = @(
         @{
@@ -31,4 +31,22 @@
             MaximumVersion = '2.99.99'
         }
     )
+    PrivateData          = @{
+        PSData = @{
+            Tags       = 'Windows', 'Linux', 'TextMate', 'Markdown', 'Syntax Highlighting'
+            LicenseUri = 'https://github.com/trackd/TextMate/blob/main/LICENSE'
+            ProjectUri = 'https://github.com/trackd/TextMate'
+            IconUri    = 'https://raw.githubusercontent.com/trackd/TextMate/main/assets/texmatelogo.png'
+        }
+    }
+    HelpInfoURI            = 'https://github.com/trackd/TextMate/tree/main/docs/en-us'
+    DscResourcesToExport   = @()
+    RequiredAssemblies     = @()
+    ModuleList             = @()
+    FileList               = @()
+    ScriptsToProcess       = @()
+    TypesToProcess         = @()
+    NestedModules          = @()
+    FunctionsToExport      = @()
+    VariablesToExport      = @()
 }
