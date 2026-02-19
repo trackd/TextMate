@@ -33,7 +33,7 @@
     )
     PrivateData          = @{
         PSData = @{
-            Tags       = 'Windows', 'Linux', 'OSX', 'TextMate', 'Markdown', 'Syntax Highlighting'
+            Tags       = 'Windows', 'Linux', 'OSX', 'TextMate', 'Markdown', 'SyntaxHighlighting'
             LicenseUri = 'https://github.com/trackd/TextMate/blob/main/LICENSE'
             ProjectUri = 'https://github.com/trackd/TextMate'
             IconUri    = 'https://raw.githubusercontent.com/trackd/TextMate/main/assets/logo.png'

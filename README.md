@@ -19,8 +19,8 @@ What it does
 | [Format-CSharp](docs/en-us/Format-CSharp.md) | Highlight C# source |
 | [Format-Markdown](docs/en-us/Format-Markdown.md) | Highlight Markdown content |
 | [Format-PowerShell](docs/en-us/Format-PowerShell.md) | Highlight PowerShell code |
-| [Get-SupportedTextMate](docs/en-us/Get-SupportedTextMate.md) | List available grammars and file extensions. |
-| [Test-SupportedTextMate](docs/en-us/Test-SupportedTextMate.md) | Check support for a file, extension, or language ID. |
+| [Get-TextMateGrammar](docs/en-us/Get-TextMateGrammar.md) | List available grammars and file extensions. |
+| [Test-TextMate](docs/en-us/Test-TextMate.md) | Check support for a file, extension, or language ID. |
 
 ```note
 Format-CSharp/Markdown/Powershell is just sugar for Format-TextMate -Language CSharp/PowerShell/Markdown
