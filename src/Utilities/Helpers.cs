@@ -36,28 +36,28 @@ public static class TextMateHelper {
             throw new TypeInitializationException(nameof(TextMateHelper), ex);
         }
     }
+    internal static string[] SplitToLines(string input) {
+        if (input.Length == 0) {
+            return [string.Empty];
+        }
+
+        if (input.Contains('\n') || input.Contains('\r')) {
+            return input.Split(["\r\n", "\n", "\r"], StringSplitOptions.None);
+        }
+
+        return [input];
+    }
+
     internal static string[] NormalizeToLines(List<string> buffer) {
         if (buffer.Count == 0) {
             return [];
         }
 
-        // Multiple strings in buffer - treat each as a line
-        if (buffer.Count > 1) {
-            return [.. buffer];
+        var lines = new List<string>(buffer.Count * 2);
+        foreach (string item in buffer) {
+            lines.AddRange(SplitToLines(item));
         }
 
-        // Single string - check if it contains newlines
-        string? single = buffer[0];
-        if (string.IsNullOrEmpty(single)) {
-            return single is not null ? [single] : [];
-        }
-
-        // Split on newlines if present
-        if (single.Contains('\n') || single.Contains('\r')) {
-            return single.Split(["\r\n", "\n", "\r"], StringSplitOptions.None);
-        }
-
-        // Single string with no newlines
-        return [single];
+        return [.. lines];
     }
 }

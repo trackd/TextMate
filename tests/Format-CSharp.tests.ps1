@@ -2,6 +2,8 @@ BeforeAll {
     if (-Not (Get-Module 'TextMate')) {
         Import-Module (Join-Path $PSScriptRoot '..' 'output' 'TextMate.psd1') -ErrorAction Stop
     }
+
+    Import-Module (Join-Path $PSScriptRoot 'testhelper.psm1') -Force
 }
 
 Describe 'Format-CSharp' {
@@ -32,6 +34,16 @@ Describe 'Format-CSharp' {
             Remove-Item -Force -ErrorAction SilentlyContinue $temp
         }
     }
+
+    It 'Splits multiline pipeline items into individual lines' {
+        $s1 = "// a`npublic class A { }"
+        $s2 = "// b`npublic class B { }"
+
+        $out = @($s1, $s2) | Format-CSharp
+
+        $out.LineCount | Should -Be 4
+    }
+
     It 'Should have Help and examples' {
         $help = Get-Help Format-CSharp -Full
         $help.Synopsis | Should -Not -BeNullOrEmpty

@@ -16,7 +16,7 @@ function _GetSpectreRenderable {
         $console = [AnsiConsole]::Create($settings)
         $console.Write($RenderableObject)
         if ($EscapeAnsi) {
-            return $writer.ToString() | _EscapeAnsi
+            return [Host.PSHostUserInterface]::GetOutputString($writer.ToString(),$false)
         }
         $writer.ToString()
     }

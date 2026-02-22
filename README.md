@@ -9,7 +9,7 @@ What it does
 - Provides discovery and testing helpers for installed grammars, extensions, or language IDs.
 - Does inline Sixel images in markdown
 
-![Demo](/assets/demo.png)
+![Demo](./assets/demo.png)
 
 ## Cmdlets
 

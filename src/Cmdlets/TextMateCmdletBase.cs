@@ -101,7 +101,7 @@ public abstract class TextMateCmdletBase : PSCmdlet {
                     EnsureSourceHints();
                 }
 
-                _inputObjectBuffer.Add(inputString);
+                _inputObjectBuffer.AddRange(TextMateHelper.SplitToLines(inputString));
             }
         }
         else if (InputObject is not null) {
@@ -142,7 +142,7 @@ public abstract class TextMateCmdletBase : PSCmdlet {
     }
 
     private HighlightedText? ProcessStringInput() {
-        string[] lines = TextMateHelper.NormalizeToLines(_inputObjectBuffer);
+        string[] lines = [.. _inputObjectBuffer];
 
         if (lines.AllIsNullOrEmpty()) {
             WriteVerbose("All input strings are null or empty");
