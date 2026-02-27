@@ -40,6 +40,15 @@ public abstract class TextMateCmdletBase : PSCmdlet {
     public SwitchParameter LineNumbers { get; set; }
 
     /// <summary>
+    /// When present, wrap output in a Spectre Panel.
+    /// </summary>
+    [Parameter]
+    public SwitchParameter Panel { get; set; }
+
+    // [Parameter]
+    // public SwitchParameter Page { get; set; }
+
+    /// <summary>
     /// Fixed language or extension token used for rendering.
     /// </summary>
     protected abstract string FixedToken { get; }
@@ -156,7 +165,9 @@ public abstract class TextMateCmdletBase : PSCmdlet {
             ? null
             : new HighlightedText {
                 Renderables = renderables,
-                ShowLineNumbers = LineNumbers.IsPresent
+                ShowLineNumbers = LineNumbers.IsPresent,
+                Language = token,
+                WrapInPanel = Panel.IsPresent
             };
     }
 
@@ -180,7 +191,9 @@ public abstract class TextMateCmdletBase : PSCmdlet {
         if (renderables is not null) {
             yield return new HighlightedText {
                 Renderables = renderables,
-                ShowLineNumbers = LineNumbers.IsPresent
+                ShowLineNumbers = LineNumbers.IsPresent,
+                Language = token,
+                WrapInPanel = Panel.IsPresent
             };
         }
     }

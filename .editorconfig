@@ -121,6 +121,7 @@ dotnet_diagnostic.IDE0029.severity = warning
 dotnet_diagnostic.IDE0030.severity = warning
 dotnet_diagnostic.IDE0270.severity = warning
 dotnet_diagnostic.IDE0019.severity = warning
+dotnet_diagnostic.IDE0010.severity = none
 
 # Prefer var when the type is apparent (modern and concise)
 # how does this work with IDE0007?
