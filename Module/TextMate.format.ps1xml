@@ -41,7 +41,7 @@
           </TableRowEntries>
         </TableControl>
     </View>
-    <!-- <View>
+    <View>
       <Name>HighlightedText</Name>
       <ViewSelectedBy>
         <TypeName>PSTextMate.Core.HighlightedText</TypeName>
@@ -52,13 +52,13 @@
             <CustomItem>
               <ExpressionBinding>
                 <ScriptBlock>
-                  $_.AutoPage()
+                  [PSTextMate.Utilities.Writer]::Write($_)
                 </ScriptBlock>
               </ExpressionBinding>
             </CustomItem>
           </CustomEntry>
         </CustomEntries>
       </CustomControl>
-    </View> -->
+    </View>
   </ViewDefinitions>
 </Configuration>

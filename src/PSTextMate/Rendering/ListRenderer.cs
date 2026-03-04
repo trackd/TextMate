@@ -128,8 +128,8 @@ internal static class ListRenderer {
                     if (string.IsNullOrEmpty(linkText)) {
                         linkText = link.Url ?? "";
                     }
-                    var linkStyle = new Style(Color.Blue, null, Decoration.Underline, link.Url);
-                    paragraph.Append(linkText, linkStyle);
+                    Style linkStyle = SpectreStyleCompat.Create(Color.Blue, null, Decoration.Underline);
+                    SpectreStyleCompat.Append(paragraph, linkText, linkStyle, link.Url);
                     break;
 
                 case LineBreakInline:

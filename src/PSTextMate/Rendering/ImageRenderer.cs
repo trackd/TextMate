@@ -325,7 +325,7 @@ public static class ImageRenderer {
     /// <returns>A markup string representing the image as a link</returns>
     private static Text CreateImageFallback(string altText, string imageUrl) {
         string linkText = $"🖼️ Image: {altText}";
-        var style = new Style(Color.Blue, null, Decoration.Underline, imageUrl);
+        Style style = SpectreStyleCompat.CreateWithLink(Color.Blue, null, Decoration.Underline, imageUrl);
         return new Text(linkText, style);
     }
 
@@ -343,7 +343,7 @@ public static class ImageRenderer {
 
             // Build a text-based content with clickable link style
             string display = $"🖼️ {altText}{sizeText}";
-            var linkStyle = new Style(Color.Blue, null, Decoration.Underline, imageUrl);
+            Style linkStyle = SpectreStyleCompat.CreateWithLink(Color.Blue, null, Decoration.Underline, imageUrl);
             var text = new Text(display, linkStyle);
             return new Panel(text)
                 .Header("Image (Sixel not available)")
@@ -363,7 +363,7 @@ public static class ImageRenderer {
     /// <returns>A markup string representing the image as a link</returns>
     private static Text CreateImageFallbackInline(string altText, string imageUrl) {
         string display = $"🖼️ {altText}";
-        var style = new Style(Color.Blue, null, Decoration.Underline, imageUrl);
+        Style style = SpectreStyleCompat.CreateWithLink(Color.Blue, null, Decoration.Underline, imageUrl);
         return new Text(display, style);
     }
 

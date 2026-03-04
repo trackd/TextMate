@@ -23,6 +23,10 @@ public sealed class HighlightedText : Renderable {
     private IEnumerable<IRenderable>? _viewSource;
     private int _viewStart;
     private int _viewCount;
+    // When a view is active, keep the total document line count when available
+    // so line-number gutter width can be computed against the full document
+    // (prevents gutter from changing across pages).
+    private int _documentLineCount = -1;
 
     /// <summary>
     /// When true, prepend line numbers with a gutter separator.
@@ -58,6 +62,12 @@ public sealed class HighlightedText : Renderable {
         _viewSource = source ?? throw new ArgumentNullException(nameof(source));
         _viewStart = Math.Max(0, start);
         _viewCount = Math.Max(0, count);
+        // Try to capture the full source count when possible (ICollection/IReadOnlyCollection/IList)
+        _documentLineCount = source is ICollection<IRenderable> coll
+            ? coll.Count
+            : source is IReadOnlyCollection<IRenderable> rocoll
+                ? rocoll.Count
+                : source is System.Collections.ICollection nonGeneric ? nonGeneric.Count : -1;
     }
 
     /// <summary>
@@ -67,6 +77,7 @@ public sealed class HighlightedText : Renderable {
         _viewSource = null;
         _viewStart = 0;
         _viewCount = 0;
+        _documentLineCount = -1;
     }
 
     private IEnumerable<IRenderable> GetRenderablesEnumerable() =>
@@ -167,7 +178,10 @@ public sealed class HighlightedText : Renderable {
 
         int actualLineCount = CountLines(segments);
         int actualWidth = ResolveLineNumberWidth(actualLineCount);
-        if (actualWidth != width) {
+        // If we have a document-wide line count available or an explicit
+        // LineNumberWidth, prefer that value and avoid reflowing based on
+        // measured content, which would make the gutter change size.
+        if (!LineNumberWidth.HasValue && _documentLineCount <= 0 && actualWidth != width) {
             width = actualWidth;
             contentWidth = Math.Max(1, maxWidth - (width + GutterSeparator.Length));
             segments = [.. ((IRenderable)rows).Render(options, contentWidth)];
@@ -245,13 +259,46 @@ public sealed class HighlightedText : Renderable {
             }
 
             try {
-                var segments = r.Render(options, width).ToList();
-                int lines = CountLines(segments);
-                if (lines <= 0) lines = 1;
-                list.Add(lines);
+                // Prefer Measure() to avoid rendering side-effects (images, sixels).
+                Measurement m = r.Measure(options, width);
+                int maxWidth = Math.Max(1, m.Max);
+                int estimatedLines = maxWidth <= width ? 1 : (int)Math.Ceiling((double)maxWidth / width);
+                list.Add(Math.Max(1, estimatedLines));
             }
             catch {
                 list.Add(1);
+            }
+        }
+
+        return [.. list];
+    }
+
+    /// <summary>
+    /// Measure each renderable and return the full Measurement for each item.
+    /// This is similar to <see cref="MeasureRenderables"/> but preserves the
+    /// Measurement (min/max) which callers can use to compute both width and
+    /// estimated height.
+    /// </summary>
+    public Measurement[] MeasureRenderablesFull(int width) {
+        Capabilities caps = AnsiConsole.Console.Profile.Capabilities;
+        var size = new Size(width, Math.Max(1, Console.WindowHeight));
+        var options = new RenderOptions(caps, size);
+
+        IEnumerable<IRenderable> source = _viewSource is null ? Renderables : _viewSource;
+        var list = new List<Measurement>(source.Count());
+
+        foreach (IRenderable? r in source) {
+            if (r is null) {
+                list.Add(new Measurement(1, 1));
+                continue;
+            }
+
+            try {
+                Measurement m = r.Measure(options, width);
+                list.Add(m);
+            }
+            catch {
+                list.Add(new Measurement(1, 1));
             }
         }
 
@@ -263,7 +310,10 @@ public sealed class HighlightedText : Renderable {
             return LineNumberWidth.Value;
         }
 
-        int lastLineNumber = LineNumberStart + Math.Max(0, lineCount - 1);
+        // Prefer computing width based on the total document line count when
+        // available so the gutter remains stable across paged views.
+        int effectiveTotal = _documentLineCount > 0 ? _documentLineCount : lineCount;
+        int lastLineNumber = LineNumberStart + Math.Max(0, effectiveTotal - 1);
         return lastLineNumber.ToString(CultureInfo.InvariantCulture).Length;
     }
 
@@ -327,17 +377,34 @@ public sealed class HighlightedText : Renderable {
             WrapInPanel = WrapInPanel
         };
     }
-    public void ShowPager() {
+
+    public void ShowAlternateBufferPager() {
         if (LineCount <= 0) return;
 
         using var pager = new Pager(this);
         pager.Show();
     }
-    public IRenderable? AutoPage() {
+    public void ShowPager() {
+        if (LineCount <= 0) return;
+
+        using var pager = new Pager(this);
+        pager.Show(useAlternateBuffer: true);
+    }
+    public IRenderable? AutoPage(bool alternate = true) {
         if (LineCount > Console.WindowHeight - 2) {
-            ShowPager();
+            if (alternate) ShowAlternateBufferPager();
+            else ShowPager();
             return null;
         }
         return this;
     }
+
+    /// <summary>
+    /// Renders this highlighted text to a string.
+    /// </summary>
+    public string Write(bool autoPage = true, bool alternatePager = true)
+        => Writer.Write(this, autoPage, alternatePager);
+
+    public override string ToString()
+        => Writer.WriteToString(this, customItemFormatter: true);
 }

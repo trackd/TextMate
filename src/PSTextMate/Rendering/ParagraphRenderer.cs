@@ -72,8 +72,9 @@ internal static partial class ParagraphRenderer {
                             if (TryParseUsernameLinks(literalText, out TextSegment[]? usernameSegments)) {
                                 foreach (TextSegment segment in usernameSegments) {
                                     if (segment.IsUsername) {
-                                        var usernameStyle = new Style(Color.Blue, null, Decoration.Underline, $"https://github.com/{segment.Text.TrimStart('@')}");
-                                        paragraph.Append(segment.Text, usernameStyle);
+                                        string usernameUrl = $"https://github.com/{segment.Text.TrimStart('@')}";
+                                        Style usernameStyle = SpectreStyleCompat.Create(Color.Blue, null, Decoration.Underline);
+                                        SpectreStyleCompat.Append(paragraph, segment.Text, usernameStyle, usernameUrl);
                                         addedAny = true;
                                     }
                                     else {
@@ -109,8 +110,8 @@ internal static partial class ParagraphRenderer {
                                     string linkText = ExtractInlineText(linkInline);
                                     if (string.IsNullOrEmpty(linkText)) linkText = linkInline.Url ?? "";
                                     Style baseLink = GetLinkStyle(theme) ?? new Style(Color.Blue, null, Decoration.Underline);
-                                    var combined = new Style(baseLink.Foreground, baseLink.Background, baseLink.Decoration | decoration | Decoration.Underline, linkInline.Url);
-                                    paragraph.Append(linkText, combined);
+                                    Style combined = SpectreStyleCompat.Create(baseLink.Foreground, baseLink.Background, baseLink.Decoration | decoration | Decoration.Underline);
+                                    SpectreStyleCompat.Append(paragraph, linkText, combined, linkInline.Url);
                                     addedAny = true;
                                     break;
                                 default:
@@ -181,8 +182,8 @@ internal static partial class ParagraphRenderer {
             string altText = ExtractInlineText(link);
             if (string.IsNullOrEmpty(altText)) altText = "Image";
             string imageLinkText = $"🖼️ {altText}";
-            var style = new Style(Color.Blue, null, Decoration.Underline, link.Url);
-            paragraph.Append(imageLinkText, style);
+            Style style = SpectreStyleCompat.Create(Color.Blue, null, Decoration.Underline);
+            SpectreStyleCompat.Append(paragraph, imageLinkText, style, link.Url);
             return;
         }
 
@@ -191,8 +192,8 @@ internal static partial class ParagraphRenderer {
 
         Style linkStyle = GetLinkStyle(theme) ?? new Style(Color.Blue, null, Decoration.Underline);
         // Create new style with link parameter
-        var styledLink = new Style(linkStyle.Foreground, linkStyle.Background, linkStyle.Decoration | Decoration.Underline, link.Url);
-        paragraph.Append(linkText, styledLink);
+        Style styledLink = SpectreStyleCompat.Create(linkStyle.Foreground, linkStyle.Background, linkStyle.Decoration | Decoration.Underline);
+        SpectreStyleCompat.Append(paragraph, linkText, styledLink, link.Url);
     }
 
     /// <summary>
@@ -203,8 +204,8 @@ internal static partial class ParagraphRenderer {
         if (string.IsNullOrEmpty(url)) return;
 
         Style linkStyle = GetLinkStyle(theme) ?? new Style(Color.Blue, null, Decoration.Underline);
-        var styledLink = new Style(linkStyle.Foreground, linkStyle.Background, linkStyle.Decoration | Decoration.Underline, url);
-        paragraph.Append(url, styledLink);
+        Style styledLink = SpectreStyleCompat.Create(linkStyle.Foreground, linkStyle.Background, linkStyle.Decoration | Decoration.Underline);
+        SpectreStyleCompat.Append(paragraph, url, styledLink, url);
     }
 
     /// <summary>

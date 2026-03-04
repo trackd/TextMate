@@ -8,6 +8,7 @@ using PSTextMate.Utilities;
 using Spectre.Console;
 using Spectre.Console.Rendering;
 using TextMateSharp.Themes;
+using TCell = Markdig.Extensions.Tables.TableCell;
 
 namespace PSTextMate.Rendering;
 
@@ -110,7 +111,7 @@ internal static class TableRenderer {
             var cells = new List<TableCellContent>();
 
             for (int i = 0; i < row.Count; i++) {
-                if (row[i] is TableCell cell) {
+                if (row[i] is TCell cell) {
                     string cellText = ExtractCellText(cell, theme);
                     TableColumnAlign? alignment = i < table.ColumnDefinitions.Count ? table.ColumnDefinitions[i].Alignment : null;
                     cells.Add(new TableCellContent(cellText, alignment));
@@ -126,7 +127,7 @@ internal static class TableRenderer {
     /// <summary>
     /// Extracts text from table cells using optimized inline processing.
     /// </summary>
-    private static string ExtractCellText(TableCell cell, Theme theme) {
+    private static string ExtractCellText(TCell cell, Theme theme) {
         StringBuilder textBuilder = StringBuilderPool.Rent();
 
         foreach (Block block in cell) {
@@ -185,7 +186,7 @@ internal static class TableRenderer {
     private static Style GetTableBorderStyle(Theme theme) {
         string[] borderScopes = ["punctuation.definition.table"];
         Style? style = TokenProcessor.GetStyleForScopes(borderScopes, theme);
-        return style is not null ? style : new Style(foreground: Color.Grey);
+        return style ?? new Style(foreground: Color.Grey);
     }
 
     /// <summary>
@@ -196,7 +197,7 @@ internal static class TableRenderer {
         Style? baseStyle = TokenProcessor.GetStyleForScopes(headerScopes, theme);
         Color fgColor = baseStyle?.Foreground ?? Color.Yellow;
         Color? bgColor = baseStyle?.Background;
-        Decoration decoration = (baseStyle is not null ? baseStyle.Decoration : Decoration.None) | Decoration.Bold;
+        Decoration decoration = (baseStyle?.Decoration ?? Decoration.None) | Decoration.Bold;
         return new Style(fgColor, bgColor, decoration);
     }
 

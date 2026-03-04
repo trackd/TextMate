@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text;
+using PSTextMate.Utilities;
 using Spectre.Console;
 
 namespace PSTextMate.Helpers;
@@ -530,8 +531,8 @@ public static class VTParser {
             Link = null;
         }
 
-        public readonly Style ToSpectreStyle() =>
-            new(Foreground, Background, Decoration, Link);
+        public readonly Style ToSpectreStyle()
+            => SpectreStyleCompat.CreateWithLink(Foreground, Background, Decoration, Link);
 
         public readonly string ToMarkup() {
             // Use StringBuilder to avoid List<string> allocation

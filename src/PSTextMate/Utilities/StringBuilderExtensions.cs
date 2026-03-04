@@ -45,7 +45,7 @@ public static class StringBuilderExtensions {
         value ??= string.Empty;
         return style is not null
             ? builder.Append('[')
-                .Append(style.ToMarkup())
+                .Append(SpectreStyleCompat.ToMarkup(style))
                 .Append(']')
                 .Append(value.EscapeMarkup())
                 .Append("[/]")
@@ -63,7 +63,7 @@ public static class StringBuilderExtensions {
         value ??= string.Empty;
         return style is not null
             ? builder.Append('[')
-                .Append(style.ToMarkup())
+                .Append(SpectreStyleCompat.ToMarkup(style))
                 .Append(']')
                 .Append(value)
                 .Append("[/] ")
@@ -81,7 +81,7 @@ public static class StringBuilderExtensions {
     public static StringBuilder AppendWithStyle(this StringBuilder builder, Style? style, ReadOnlySpan<char> value) {
         return style is not null
             ? builder.Append('[')
-                .Append(style.ToMarkup())
+                .Append(SpectreStyleCompat.ToMarkup(style))
                 .Append(']')
                 .Append(value)
                 .Append("[/]")

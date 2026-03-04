@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <AssemblyName>PSTextMate.ALC</AssemblyName>
+        <TargetFramework>net8.0</TargetFramework>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <LangVersion>latest</LangVersion>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+    <ItemGroup>
+        <InternalsVisibleTo Include="PSTextMate" />
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="System.Management.Automation" Version="7.4" PrivateAssets="all" />
+    </ItemGroup>
+</Project>

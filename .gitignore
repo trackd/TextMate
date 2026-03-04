@@ -13,3 +13,4 @@ debug.md
 ref/**
 Copilot-Processing.md
 tools/**
+src/Utilities/TMConsole.cs

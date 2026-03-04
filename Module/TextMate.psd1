@@ -1,5 +1,5 @@
 @{
-    RootModule           = 'lib/PSTextMate.dll'
+    RootModule           = 'TextMate.psm1'
     ModuleVersion        = '0.1.0'
     GUID                 = 'fe78d2cb-2418-4308-9309-a0850e504cd6'
     Author               = 'trackd'
@@ -24,13 +24,12 @@
         'Show-TextMate'
     )
     FormatsToProcess     = 'TextMate.format.ps1xml'
-    RequiredModules      = @(
-        @{
-            ModuleName     = 'PwshSpectreConsole'
-            ModuleVersion  = '2.3.0'
-            MaximumVersion = '2.99.99'
-        }
-    )
+    RequiredModules      = @()
+    #     @{
+    #         ModuleName     = 'PwshSpectreConsole'
+    #         ModuleVersion  = '2.5.0'
+    #         MaximumVersion = '2.99.99'
+    #     }
     PrivateData          = @{
         PSData = @{
             Tags       = 'Windows', 'Linux', 'OSX', 'TextMate', 'Markdown', 'SyntaxHighlighting'

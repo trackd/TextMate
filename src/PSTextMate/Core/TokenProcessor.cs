@@ -66,7 +66,7 @@ internal static class TokenProcessor {
 
         // If the style serializes to an empty markup string, treat it as no style
         // to avoid emitting empty [] tags which Spectre.Markup rejects.
-        string styleMarkup = styleHint.ToMarkup();
+        string styleMarkup = SpectreStyleCompat.ToMarkup(styleHint);
         if (string.IsNullOrEmpty(styleMarkup)) {
             return (processedText, null);
         }
@@ -88,7 +88,7 @@ internal static class TokenProcessor {
         // Fast-path: if no escaping needed, append span directly with style-aware overload
         if (!escapeMarkup) {
             if (style is not null) {
-                string styleMarkup = style.ToMarkup();
+                string styleMarkup = SpectreStyleCompat.ToMarkup(style);
                 if (!string.IsNullOrEmpty(styleMarkup)) {
                     builder.Append('[').Append(styleMarkup).Append(']').Append(text).Append("[/]").AppendLine();
                 }
@@ -114,7 +114,7 @@ internal static class TokenProcessor {
         if (!needsEscape) {
             // Safe fast-path: append span directly
             if (style is not null) {
-                string styleMarkup = style.ToMarkup();
+                string styleMarkup = SpectreStyleCompat.ToMarkup(style);
                 if (!string.IsNullOrEmpty(styleMarkup)) {
                     builder.Append('[').Append(styleMarkup).Append(']').Append(text).Append("[/]").AppendLine();
                 }
@@ -131,7 +131,7 @@ internal static class TokenProcessor {
         // Slow path: fallback to the reliable Markup.Escape for correctness when special characters are present
         string escaped = Markup.Escape(text.ToString());
         if (style is not null) {
-            string styleMarkup = style.ToMarkup();
+            string styleMarkup = SpectreStyleCompat.ToMarkup(style);
             if (!string.IsNullOrEmpty(styleMarkup)) {
                 builder.Append('[').Append(styleMarkup).Append(']').Append(escaped).Append("[/]").AppendLine();
             }

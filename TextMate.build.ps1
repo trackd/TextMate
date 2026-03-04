@@ -5,21 +5,22 @@ param(
     [switch]$SkipHelp,
     [switch]$SkipTests
 )
+
 Write-Host "$($PSBoundParameters.GetEnumerator())" -ForegroundColor Cyan
 
 $modulename = [System.IO.Path]::GetFileName($PSCommandPath) -replace '\.build\.ps1$'
+# $modulename = 'PSTextMate'
 
 $script:folders = @{
     ModuleName       = $modulename
     ProjectRoot      = $PSScriptRoot
     TempLib          = Join-Path $PSScriptRoot 'templib'
-    SourcePath       = Join-Path $PSScriptRoot 'src'
     OutputPath       = Join-Path $PSScriptRoot 'output'
     DestinationPath  = Join-Path $PSScriptRoot 'output' 'lib'
     ModuleSourcePath = Join-Path $PSScriptRoot 'module'
     DocsPath         = Join-Path $PSScriptRoot 'docs' 'en-US'
     TestPath         = Join-Path $PSScriptRoot 'tests'
-    CsprojPath       = Join-Path $PSScriptRoot 'src' "$modulename.csproj"
+    CsprojPath       = Join-Path $PSScriptRoot 'src' 'PSTextMate' 'PSTextMate.csproj'
 }
 
 task Clean {
@@ -35,7 +36,9 @@ task Build {
         Write-Warning 'C# project not found, skipping Build'
         return
     }
-    exec { dotnet publish $folders.CsprojPath --configuration $Configuration --nologo --verbosity minimal --output $folders.TempLib }
+    exec {
+        dotnet publish $folders.CsprojPath --configuration $Configuration --nologo --verbosity minimal --output $folders.TempLib
+    }
     $null = New-Item -Path $folders.outputPath -ItemType Directory -Force
     $rids = @('win-x64', 'osx-arm64', 'linux-x64','linux-arm64','win-arm64')
     foreach ($rid in $rids) {
@@ -77,12 +80,6 @@ task GenerateHelp -if (-not $SkipHelp) {
         return
     }
 
-    if (-Not (Get-Module PwshSpectreConsole -ListAvailable)) {
-        # just temporarily while im refactoring the PwshSpectreConsole module.
-        $ParentPath = Split-Path $folders.ProjectRoot -Parent
-        Import-Module (Join-Path $ParentPath 'PwshSpectreConsole' 'output' 'PwshSpectreConsole.psd1')
-    }
-
     Import-Module $modulePath -Force
 
     $helpOutputPath = Join-Path $folders.OutputPath 'en-US'
@@ -108,12 +105,6 @@ task Test -if (-not $SkipTests) {
     if (-not (Test-Path $folders.TestPath)) {
         Write-Warning "Test directory not found at: $($folders.TestPath)"
         return
-    }
-
-    if (-not (Get-Module PwshSpectreConsole -ListAvailable)) {
-        # just temporarily while im refactoring the PwshSpectreConsole module.
-        $ParentPath = Split-Path $folders.ProjectRoot -Parent
-        Import-Module (Join-Path $ParentPath 'PwshSpectreConsole' 'output' 'PwshSpectreConsole.psd1')
     }
 
     Import-Module (Join-Path $folders.OutputPath ($folders.ModuleName + '.psd1')) -ErrorAction Stop

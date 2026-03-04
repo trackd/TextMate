@@ -157,6 +157,7 @@ csharp_style_unused_value_expression_statement_preference = unused_local_variabl
 # Nullable reference types - enabled as suggestions; project opt-in controls runtime enforcement
 nullable = enable
 csharp_style_prefer_primary_constructors = false
+dotnet_diagnostic.IDE0072.severity = none
 
 # Formatting / newline preferences
 # prefer Stroustrup

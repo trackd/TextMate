@@ -8,7 +8,7 @@ public static class VTHelpers {
     public static void HideCursor() => Console.Write("\x1b[?25l");
     public static void ShowCursor() => Console.Write("\x1b[?25h");
     public static void ClearScreen() => Console.Write("\x1b[2J\x1b[H");
-    public static void ClearScreenAlt() => Console.Write("\x1bc");
+    public static void ClearScreenAlt() => ClearScreen();
     public static void ClearRow(int row) => Console.Write($"\x1b[{row};1H\x1b[2K");
     public static void SetCursorPosition(int row, int column) => Console.Write($"\x1b[{row};{column}H");
     public static void CursorHome() => Console.Write("\x1b[H");
