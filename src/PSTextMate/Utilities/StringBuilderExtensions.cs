@@ -1,7 +1,3 @@
-using System.Globalization;
-using System.Text;
-using Spectre.Console;
-
 namespace PSTextMate.Utilities;
 
 /// <summary>

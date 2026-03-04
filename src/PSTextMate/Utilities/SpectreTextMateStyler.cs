@@ -1,8 +1,3 @@
-using System.Collections.Concurrent;
-using System.Runtime.CompilerServices;
-using Spectre.Console;
-using TextMateSharp.Themes;
-
 namespace PSTextMate.Core;
 
 /// <summary>

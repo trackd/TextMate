@@ -1,8 +1,3 @@
-using System.Collections.Concurrent;
-using TextMateSharp.Grammars;
-using TextMateSharp.Registry;
-using TextMateSharp.Themes;
-
 namespace PSTextMate.Core;
 
 /// <summary>

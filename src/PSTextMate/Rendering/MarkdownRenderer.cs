@@ -1,13 +1,3 @@
-using Markdig;
-using Markdig.Helpers;
-using Markdig.Syntax;
-using Markdig.Syntax.Inlines;
-using PSTextMate.Utilities;
-using Spectre.Console;
-using Spectre.Console.Rendering;
-using TextMateSharp.Grammars;
-using TextMateSharp.Themes;
-
 namespace PSTextMate.Rendering;
 
 /// <summary>

@@ -1,13 +1,3 @@
-using System.Text;
-using Markdig.Extensions.Tables;
-using Markdig.Helpers;
-using Markdig.Syntax;
-using Markdig.Syntax.Inlines;
-using PSTextMate.Core;
-using PSTextMate.Utilities;
-using Spectre.Console;
-using Spectre.Console.Rendering;
-using TextMateSharp.Themes;
 using TCell = Markdig.Extensions.Tables.TableCell;
 
 namespace PSTextMate.Rendering;
@@ -25,7 +15,7 @@ internal static class TableRenderer {
     /// <param name="theme">Theme for styling</param>
     /// <returns>Rendered table with proper styling</returns>
     public static IRenderable? Render(Markdig.Extensions.Tables.Table table, Theme theme) {
-        var spectreTable = new Spectre.Console.Table {
+        var spectreTable = new Table {
             ShowFooters = false,
 
             // Configure table appearance

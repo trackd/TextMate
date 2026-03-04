@@ -1,5 +1,3 @@
-using TextMateSharp.Grammars;
-
 namespace PSTextMate;
 
 /// <summary>
@@ -41,11 +39,7 @@ public static class TextMateHelper {
             return [string.Empty];
         }
 
-        if (input.Contains('\n') || input.Contains('\r')) {
-            return input.Split(["\r\n", "\n", "\r"], StringSplitOptions.None);
-        }
-
-        return [input];
+        return input.Contains('\n') || input.Contains('\r') ? input.Split(["\r\n", "\n", "\r"], StringSplitOptions.None) : [input];
     }
 
     internal static string[] NormalizeToLines(List<string> buffer) {

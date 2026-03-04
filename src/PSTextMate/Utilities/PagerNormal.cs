@@ -1,9 +1,3 @@
-﻿using System.Globalization;
-using Spectre.Console;
-using Spectre.Console.Rendering;
-using System.Linq;
-using PSTextMate.Core;
-
 namespace PSTextMate.Utilities;
 
 public class PagerNormal : IDisposable {

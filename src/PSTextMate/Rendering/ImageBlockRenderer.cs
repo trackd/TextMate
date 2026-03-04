@@ -1,6 +1,3 @@
-using Spectre.Console;
-using Spectre.Console.Rendering;
-
 namespace PSTextMate.Rendering;
 
 /// <summary>

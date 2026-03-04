@@ -1,12 +1,3 @@
-using Markdig.Extensions.Tables;
-using Markdig.Syntax;
-using Markdig.Syntax.Inlines;
-using PSTextMate.Utilities;
-using Spectre.Console;
-using Spectre.Console.Rendering;
-using TextMateSharp.Grammars;
-using TextMateSharp.Themes;
-
 namespace PSTextMate.Rendering;
 
 /// <summary>
@@ -98,7 +89,7 @@ internal static class BlockRenderer {
     /// Extracts alt text from an image link inline.
     /// </summary>
     private static string ExtractImageAltText(LinkInline imageLink) {
-        var textBuilder = new System.Text.StringBuilder();
+        var textBuilder = new StringBuilder();
 
         foreach (Inline inline in imageLink) {
             if (inline is LiteralInline literal) {

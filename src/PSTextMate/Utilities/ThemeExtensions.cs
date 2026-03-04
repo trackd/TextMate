@@ -1,7 +1,3 @@
-using PSTextMate.Core;
-using Spectre.Console;
-using TextMateSharp.Themes;
-
 namespace PSTextMate.Utilities;
 
 /// <summary>

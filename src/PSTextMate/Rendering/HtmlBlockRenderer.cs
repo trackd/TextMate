@@ -1,12 +1,3 @@
-using Markdig.Syntax;
-using PSTextMate.Core;
-using Spectre.Console;
-using Spectre.Console.Rendering;
-using System.IO;
-using System.Text.RegularExpressions;
-using TextMateSharp.Grammars;
-using TextMateSharp.Themes;
-
 namespace PSTextMate.Rendering;
 
 /// <summary>
@@ -52,7 +43,7 @@ internal static partial class HtmlBlockRenderer {
         var htmlLines = new List<string>();
 
         for (int i = 0; i < htmlBlock.Lines.Count; i++) {
-            Markdig.Helpers.StringLine line = htmlBlock.Lines.Lines[i];
+            StringLine line = htmlBlock.Lines.Lines[i];
             htmlLines.Add(line.Slice.ToString());
         }
 
@@ -106,11 +97,9 @@ internal static partial class HtmlBlockRenderer {
         }
 
         Match digits = DimensionDigitsRegex().Match(value);
-        if (!digits.Success) {
-            return null;
-        }
-
-        return int.TryParse(digits.Value, out int parsed) && parsed > 0
+        return !digits.Success
+            ? null
+            : int.TryParse(digits.Value, out int parsed) && parsed > 0
             ? parsed
             : null;
     }

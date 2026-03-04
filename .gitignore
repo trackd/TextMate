@@ -5,8 +5,8 @@ src/.vs/*
 Module/lib
 debug.md
 [Oo]utput/
-*/obj/*
-*/bin/*
+**/obj/**
+**/bin/**
 .github/chatmodes/*
 .github/instructions/*
 .github/prompts/*

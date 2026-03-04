@@ -1,9 +1,3 @@
-using System.Globalization;
-using System.Linq;
-using Spectre.Console;
-using Spectre.Console.Rendering;
-using PSTextMate.Utilities;
-
 namespace PSTextMate.Core;
 
 /// <summary>
@@ -67,7 +61,7 @@ public sealed class HighlightedText : Renderable {
             ? coll.Count
             : source is IReadOnlyCollection<IRenderable> rocoll
                 ? rocoll.Count
-                : source is System.Collections.ICollection nonGeneric ? nonGeneric.Count : -1;
+                : source is ICollection nonGeneric ? nonGeneric.Count : -1;
     }
 
     /// <summary>

@@ -1,5 +1,3 @@
-﻿using System.Management.Automation;
-using PSTextMate.Core;
 
 namespace PSTextMate.Commands;
 

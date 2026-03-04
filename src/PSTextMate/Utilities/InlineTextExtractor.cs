@@ -1,6 +1,3 @@
-﻿using System.Text;
-using Markdig.Syntax.Inlines;
-
 namespace PSTextMate.Utilities;
 
 /// <summary>

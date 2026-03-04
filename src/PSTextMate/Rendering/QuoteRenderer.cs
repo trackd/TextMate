@@ -1,8 +1,3 @@
-using Markdig.Syntax;
-using Spectre.Console;
-using Spectre.Console.Rendering;
-using TextMateSharp.Themes;
-
 namespace PSTextMate.Rendering;
 
 /// <summary>

@@ -1,6 +1,3 @@
-using System.Collections.Concurrent;
-using System.Text;
-
 namespace PSTextMate.Utilities;
 
 internal static class StringBuilderPool {

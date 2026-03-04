@@ -1,10 +1,3 @@
-using System.Reflection;
-using PSTextMate.Utilities;
-using Spectre.Console;
-using Spectre.Console.Rendering;
-
-#pragma warning disable CS0103 // The name 'SixelImage' does not exist in the current context
-
 namespace PSTextMate.Rendering;
 
 /// <summary>
@@ -153,164 +146,42 @@ public static class ImageRenderer {
     /// Attempts to create a sixel renderable using the newest available implementation.
     /// </summary>
     private static bool TryCreateSixelRenderable(string imagePath, int? maxWidth, int? maxHeight, out IRenderable? result)
-        => TryCreatePixelImage(imagePath, maxWidth, out result) || TryCreateSpectreSixelImage(imagePath, maxWidth, maxHeight, out result);
+        => TryCreatePixelImage(imagePath, maxWidth, maxHeight, out result);
 
     /// <summary>
-    /// Attempts to create a PixelImage from PwshSpectreConsole using reflection.
+    /// Attempts to create a local PixelImage backed by the new sixel implementation.
     /// </summary>
-    private static bool TryCreatePixelImage(string imagePath, int? maxWidth, out IRenderable? result) {
+    private static bool TryCreatePixelImage(string imagePath, int? maxWidth, int? maxHeight, out IRenderable? result) {
         result = null;
 
         try {
-            var pixelImageType = Type.GetType("PwshSpectreConsole.PixelImage, PwshSpectreConsole");
-            if (pixelImageType is null) {
+            if (!Compatibility.TerminalSupportsSixel()) {
+                _lastSixelError = "Terminal does not report Sixel support.";
                 return false;
             }
 
-            ConstructorInfo? constructor = pixelImageType.GetConstructor([typeof(string), typeof(bool)]);
-            if (constructor is null) {
-                _lastSixelError = "Constructor not found for PixelImage with (string, bool) parameters";
+            if (!File.Exists(imagePath)) {
+                _lastSixelError = $"Image file not found: {imagePath}";
                 return false;
             }
 
-            object? pixelInstance;
-            try {
-                pixelInstance = constructor.Invoke([imagePath, false]);
-            }
-            catch (Exception ex) {
-                _lastSixelError = $"Failed to invoke PixelImage constructor: {ex.InnerException?.Message ?? ex.Message}";
-                return false;
-            }
-
-            if (pixelInstance is null) {
-                _lastSixelError = "PixelImage constructor returned null";
-                return false;
-            }
+            var pixelImage = new PixelImage(imagePath, animationDisabled: false);
 
             if (maxWidth.HasValue) {
-                PropertyInfo? maxWidthProperty = pixelImageType.GetProperty("MaxWidth");
-                if (maxWidthProperty?.CanWrite == true) {
-                    maxWidthProperty.SetValue(pixelInstance, maxWidth.Value);
-                }
+                pixelImage.MaxWidth = maxWidth.Value;
             }
 
-            if (pixelInstance is IRenderable renderable) {
-                result = renderable;
-                return true;
+            // MaxHeight is handled internally by PixelImage through terminal-height based clipping
+            // when MaxWidth is not explicitly user-limited.
+            if (maxHeight.HasValue && maxHeight.Value <= 0) {
+                _lastSixelError = "MaxHeight must be greater than zero when specified.";
+                return false;
             }
+
+            result = pixelImage;
+            return true;
         }
         catch (Exception ex) {
-            _lastSixelError = ex.Message;
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// Attempts to create a Spectre.Console SixelImage using reflection for backward compatibility.
-    /// </summary>
-    private static bool TryCreateSpectreSixelImage(string imagePath, int? maxWidth, int? maxHeight, out IRenderable? result) {
-        result = null;
-
-        try {
-            // Try the direct approach - SixelImage is in Spectre.Console namespace
-            // but might be in different assemblies (Spectre.Console vs Spectre.Console.ImageSharp)
-            Type? sixelImageType = Type.GetType("Spectre.Console.SixelImage, Spectre.Console.ImageSharp")
-                            ?? Type.GetType("Spectre.Console.SixelImage, Spectre.Console");
-
-            // If that fails, search through loaded assemblies
-            if (sixelImageType is null) {
-                foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies()) {
-                    string? assemblyName = assembly.GetName().Name;
-                    if (assemblyName?.Contains("Spectre.Console") == true) {
-                        // SixelImage is in Spectre.Console namespace regardless of assembly
-                        sixelImageType = assembly.GetType("Spectre.Console.SixelImage");
-                        if (sixelImageType is not null) {
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (sixelImageType is null) {
-                // Debug: Let's see what Spectre.Console types are available
-                foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies()) {
-                    if (assembly.GetName().Name?.Contains("Spectre.Console") == true) {
-                        string?[]? spectreTypes = [.. assembly.GetTypes()
-                            .Where(t => t.Name.Contains("Sixel", StringComparison.OrdinalIgnoreCase))
-                            .Select(t => t.FullName)
-                            .Where(name => name is not null)];
-
-                        if (spectreTypes.Length > 0) {
-                            // Found some Sixel-related types, try the first one
-                            sixelImageType = assembly.GetType(spectreTypes[0]!);
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (sixelImageType is null) {
-                return false;
-            }
-
-            // Create SixelImage instance
-            ConstructorInfo? constructor = sixelImageType.GetConstructor([typeof(string), typeof(bool)]);
-            if (constructor is null) {
-                _lastSixelError = "Constructor not found for SixelImage with (string, bool) parameters";
-                return false;
-            }
-
-            object? sixelInstance;
-            try {
-                sixelInstance = constructor.Invoke([imagePath, false]); // false = animation disabled
-            }
-            catch (Exception ex) {
-                _lastSixelError = $"Failed to invoke SixelImage constructor: {ex.InnerException?.Message ?? ex.Message}";
-                return false;
-            }
-
-            if (sixelInstance is null) {
-                _lastSixelError = "SixelImage constructor returned null";
-                return false;
-            }
-
-            // Apply size constraints if available
-            if (maxWidth.HasValue) {
-                PropertyInfo? maxWidthProperty = sixelImageType.GetProperty("MaxWidth");
-                if (maxWidthProperty?.CanWrite == true) {
-                    maxWidthProperty.SetValue(sixelInstance, maxWidth.Value);
-                }
-                else {
-                    // Try method-based approach as fallback
-                    MethodInfo? maxWidthMethod = sixelImageType.GetMethod("MaxWidth");
-                    if (maxWidthMethod is not null) {
-                        sixelInstance = maxWidthMethod.Invoke(sixelInstance, [maxWidth.Value]);
-                    }
-                }
-            }
-
-            if (maxHeight.HasValue) {
-                PropertyInfo? maxHeightProperty = sixelImageType.GetProperty("MaxHeight");
-                if (maxHeightProperty?.CanWrite == true) {
-                    maxHeightProperty.SetValue(sixelInstance, maxHeight.Value);
-                }
-                else {
-                    // Try method-based approach as fallback
-                    MethodInfo? maxHeightMethod = sixelImageType.GetMethod("MaxHeight");
-                    if (maxHeightMethod is not null) {
-                        sixelInstance = maxHeightMethod.Invoke(sixelInstance, [maxHeight.Value]);
-                    }
-                }
-            }
-
-            if (sixelInstance is IRenderable renderable) {
-                result = renderable;
-                return true;
-            }
-        }
-        catch (Exception ex) {
-            // Capture the error for debugging
             _lastSixelError = ex.Message;
         }
 
@@ -385,25 +256,7 @@ public static class ImageRenderer {
     /// <returns>True if SixelImage can be found</returns>
     public static bool IsSixelImageAvailable() {
         try {
-
-            // Try direct approaches first
-            Type? sixelImageType = Type.GetType("Spectre.Console.SixelImage, Spectre.Console.ImageSharp")
-                            ?? Type.GetType("Spectre.Console.SixelImage, Spectre.Console");
-
-            if (sixelImageType is not null)
-                return true;
-
-            // Search through loaded assemblies
-            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies()) {
-                string? assemblyName = assembly.GetName().Name;
-                if (assemblyName?.Contains("Spectre.Console") == true) {
-                    sixelImageType = assembly.GetType("Spectre.Console.SixelImage");
-                    if (sixelImageType is not null)
-                        return true;
-                }
-            }
-
-            return false;
+            return Compatibility.TerminalSupportsSixel();
         }
         catch {
             return false;

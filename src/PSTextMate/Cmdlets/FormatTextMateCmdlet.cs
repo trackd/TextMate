@@ -1,8 +1,3 @@
-using System.IO;
-using System.Management.Automation;
-using PSTextMate.Core;
-using PSTextMate.Utilities;
-using TextMateSharp.Grammars;
 
 namespace PSTextMate.Commands;
 

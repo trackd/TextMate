@@ -1,8 +1,3 @@
-using System.Runtime.CompilerServices;
-using System.Text;
-using PSTextMate.Utilities;
-using Spectre.Console;
-
 namespace PSTextMate.Helpers;
 
 /// <summary>

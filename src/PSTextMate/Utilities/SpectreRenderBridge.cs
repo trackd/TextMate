@@ -1,9 +1,3 @@
-﻿using System;
-using System.IO;
-using System.Management.Automation.Host;
-using Spectre.Console;
-using Spectre.Console.Rendering;
-
 namespace PSTextMate.Utilities;
 
 /// <summary>

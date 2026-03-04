@@ -1,6 +1,3 @@
-﻿using System.Reflection;
-using Spectre.Console;
-
 namespace PSTextMate.Utilities;
 
 internal static class SpectreStyleCompat {

@@ -1,5 +1,3 @@
-using PSTextMate.Core;
-
 namespace PSTextMate.Utilities;
 
 public static class VTHelpers {

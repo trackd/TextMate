@@ -1,9 +1,3 @@
-﻿using System.IO;
-using System.Runtime.CompilerServices;
-using PSTextMate.Core;
-using Spectre.Console;
-using Spectre.Console.Rendering;
-
 namespace PSTextMate.Utilities;
 
 /// <summary>
@@ -30,6 +24,13 @@ public static class Writer {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static string Write(HighlightedText highlightedText, bool autoPage = true, bool alternatePager = false) {
         ArgumentNullException.ThrowIfNull(highlightedText);
+
+        // Sixel payload must be written as raw control sequences. Converting to a string
+        // and flowing through host formatting can strip DCS wrappers and print payload text.
+        if (ContainsImageRenderables(highlightedText.Renderables)) {
+            AnsiConsole.Write(highlightedText);
+            return string.Empty;
+        }
 
         // Keep compatibility with prior callsites while remaining side-effect free.
         _ = autoPage;
@@ -95,5 +96,15 @@ public static class Writer {
         catch {
             return 80;
         }
+    }
+
+    private static bool ContainsImageRenderables(IEnumerable<IRenderable> renderables)
+        => renderables.Any(IsImageRenderable);
+
+    private static bool IsImageRenderable(IRenderable renderable) {
+        string name = renderable.GetType().Name;
+        return name.Contains("Sixel", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("Pixel", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("Image", StringComparison.OrdinalIgnoreCase);
     }
 }

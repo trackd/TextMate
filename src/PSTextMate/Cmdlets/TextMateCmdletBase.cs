@@ -1,9 +1,3 @@
-﻿using System.Management.Automation;
-using PSTextMate;
-using PSTextMate.Core;
-using PSTextMate.Utilities;
-using Spectre.Console.Rendering;
-using TextMateSharp.Grammars;
 
 namespace PSTextMate.Commands;
 

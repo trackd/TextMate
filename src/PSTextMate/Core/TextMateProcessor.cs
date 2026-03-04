@@ -1,11 +1,3 @@
-using System.Text;
-using PSTextMate.Core;
-using PSTextMate.Utilities;
-using Spectre.Console;
-using Spectre.Console.Rendering;
-using TextMateSharp.Grammars;
-using TextMateSharp.Themes;
-
 namespace PSTextMate.Core;
 
 /// <summary>
@@ -32,7 +24,7 @@ public static class TextMateProcessor {
         }
 
         try {
-            (TextMateSharp.Registry.Registry registry, Theme theme) = CacheManager.GetCachedTheme(themeName);
+            (Registry registry, Theme theme) = CacheManager.GetCachedTheme(themeName);
             // Resolve grammar using CacheManager which knows how to map language ids and extensions
             IGrammar? grammar = CacheManager.GetCachedGrammar(registry, grammarId, isExtension) ?? throw new InvalidOperationException(isExtension ? $"Grammar not found for file extension: {grammarId}" : $"Grammar not found for language: {grammarId}");
 
@@ -69,7 +61,7 @@ public static class TextMateProcessor {
         ArgumentNullException.ThrowIfNull(lines, nameof(lines));
 
         try {
-            (TextMateSharp.Registry.Registry registry, Theme theme) = CacheManager.GetCachedTheme(themeName);
+            (Registry registry, Theme theme) = CacheManager.GetCachedTheme(themeName);
             IGrammar? grammar = CacheManager.GetCachedGrammar(registry, grammarId, isExtension);
 
             if (grammar is null) {

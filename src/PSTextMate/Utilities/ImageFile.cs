@@ -1,13 +1,6 @@
 // class to normalize image file path/url/base64, basically any image source that is allowed in markdown.
 // if it is something Spectre.Console.SixelImage(string filename, bool animations) cannot handle we need to fix that, like downloading to a temporary file or converting the base64 to a file..
 
-using System;
-using System.IO;
-using System.Linq;
-using System.Net.Http;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-
 namespace PSTextMate.Utilities;
 
 /// <summary>

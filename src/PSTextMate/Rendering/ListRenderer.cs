@@ -1,12 +1,3 @@
-using System.Text;
-using Markdig.Extensions.TaskLists;
-using Markdig.Syntax;
-using Markdig.Syntax.Inlines;
-using PSTextMate.Utilities;
-using Spectre.Console;
-using Spectre.Console.Rendering;
-using TextMateSharp.Themes;
-
 namespace PSTextMate.Rendering;
 
 /// <summary>
@@ -182,7 +173,7 @@ internal static class ListRenderer {
                     builder.Append(isChecked ? TaskCheckedEmoji : TaskUncheckedEmoji);
                 }
                 else if (list.IsOrdered) {
-                    builder.Append(System.Globalization.CultureInfo.InvariantCulture, $"{number++}. ");
+                    builder.Append(CultureInfo.InvariantCulture, $"{number++}. ");
                 }
                 else {
                     builder.Append(UnorderedBullet);
