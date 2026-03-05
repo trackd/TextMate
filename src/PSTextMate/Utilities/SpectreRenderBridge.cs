@@ -22,7 +22,7 @@ public static class SpectreRenderBridge {
             );
         }
 
-        using StringWriter writer = new();
+        using StringWriter writer = new(new StringBuilder(1024), CultureInfo.InvariantCulture);
         var output = new AnsiConsoleOutput(writer);
         var settings = new AnsiConsoleSettings { Out = output };
         IAnsiConsole console = AnsiConsole.Create(settings);

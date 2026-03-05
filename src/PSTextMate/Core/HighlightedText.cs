@@ -100,12 +100,12 @@ public sealed class HighlightedText : Renderable {
             // to avoid creating the InnerContentRenderable wrapper.
             if (!ShowLineNumbers) {
                 var rowsInner = new Rows(GetRenderablesEnumerable());
-                var panelInner = new Panel(rowsInner) { Padding = new Padding(0, 0) };
+                var panelInner = new Panel(rowsInner) { Padding = new Padding(0, 0), Expand = true };
                 return ((IRenderable)panelInner).Render(options, maxWidth);
             }
 
             var inner = new InnerContentRenderable(this);
-            var panel = new Panel(inner) { Padding = new Padding(0, 0) };
+            var panel = new Panel(inner) { Padding = new Padding(0, 0), Expand = true };
             return ((IRenderable)panel).Render(options, maxWidth);
         }
 
@@ -121,12 +121,12 @@ public sealed class HighlightedText : Renderable {
         if (WrapInPanel) {
             if (!ShowLineNumbers) {
                 var rowsInner = new Rows(GetRenderablesEnumerable());
-                var panelInner = new Panel(rowsInner) { Padding = new Padding(0, 0) };
+                var panelInner = new Panel(rowsInner) { Padding = new Padding(0, 0), Expand = true };
                 return ((IRenderable)panelInner).Measure(options, maxWidth);
             }
 
             var inner = new InnerContentRenderable(this);
-            var panel = new Panel(inner) { Padding = new Padding(0, 0) };
+            var panel = new Panel(inner) { Padding = new Padding(0, 0), Expand = true };
             return ((IRenderable)panel).Measure(options, maxWidth);
         }
 
@@ -329,6 +329,7 @@ public sealed class HighlightedText : Renderable {
 
         var panel = new Panel(content);
         panel.Padding(0, 0);
+        panel.Expand();
 
         if (!string.IsNullOrEmpty(title)) {
             panel.Header(title);

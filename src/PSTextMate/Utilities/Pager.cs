@@ -14,6 +14,7 @@ public sealed class Pager : IDisposable {
     private readonly HighlightedText? _sourceHighlightedText;
     private readonly int? _originalLineNumberStart;
     private readonly int? _originalLineNumberWidth;
+    private readonly bool? _originalWrapInPanel;
     private readonly int? _stableLineNumberWidth;
     private int _top;
     private int WindowHeight;
@@ -22,7 +23,6 @@ public sealed class Pager : IDisposable {
     private int _lastRenderedRows;
     private List<int> _renderableHeights = [];
     private bool _lastPageHadImages;
-
     private readonly record struct ViewportWindow(int Top, int Count, int EndExclusive, bool HasImages);
 
     private sealed class PagerExclusivityMode : IExclusivityMode {
@@ -141,12 +141,16 @@ public sealed class Pager : IDisposable {
 
     public Pager(HighlightedText highlightedText) {
         _sourceHighlightedText = highlightedText;
+        _originalWrapInPanel = highlightedText.WrapInPanel;
 
         int totalLines = highlightedText.LineCount;
         int lastLineNumber = highlightedText.LineNumberStart + Math.Max(0, totalLines - 1);
         _stableLineNumberWidth = highlightedText.LineNumberWidth ?? lastLineNumber.ToString(CultureInfo.InvariantCulture).Length;
         _originalLineNumberStart = highlightedText.LineNumberStart;
         _originalLineNumberWidth = highlightedText.LineNumberWidth;
+
+        // Panel rendering in pager mode causes unstable layout; disable it for the paging session.
+        highlightedText.WrapInPanel = false;
 
         // Reference the underlying renderable array directly to avoid copying.
         _renderables = highlightedText.Renderables;
@@ -439,6 +443,8 @@ public sealed class Pager : IDisposable {
         try {
             (int width, int pageHeight) = GetPagerSize();
             int contentRows = Math.Max(1, pageHeight - 1);
+            WindowWidth = width;
+            WindowHeight = pageHeight;
 
             // Start with a clean screen then reserve the last row as a non-scrolling footer region
             if (useAlternateBuffer) {
@@ -490,6 +496,7 @@ public sealed class Pager : IDisposable {
                 _sourceHighlightedText.ClearView();
                 _sourceHighlightedText.LineNumberStart = _originalLineNumberStart ?? 1;
                 _sourceHighlightedText.LineNumberWidth = _originalLineNumberWidth;
+                _sourceHighlightedText.WrapInPanel = _originalWrapInPanel ?? false;
             }
             // Reset scroll region and restore normal screen buffer if used
             if (useAlternateBuffer) {

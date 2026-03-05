@@ -5,9 +5,20 @@ namespace PSTextMate.Utilities;
 /// Uses a cached in-memory Spectre console and returns rendered strings.
 /// </summary>
 public static class Writer {
-    private static readonly StringWriter StringConsoleWriter = new();
-    private static readonly IAnsiConsole StringConsole = CreateStringConsole(StringConsoleWriter);
-    private static readonly object SyncRoot = new();
+    private sealed class RenderContext {
+        public StringBuilder Buffer { get; }
+        public StringWriter Writer { get; }
+        public IAnsiConsole Console { get; }
+
+        public RenderContext() {
+            Buffer = new StringBuilder(2048);
+            Writer = new StringWriter(Buffer, CultureInfo.InvariantCulture);
+            Console = CreateStringConsole(Writer);
+        }
+    }
+
+    [ThreadStatic]
+    private static RenderContext? _threadContext;
 
     /// <summary>
     /// Renders a single renderable to string.
@@ -22,7 +33,7 @@ public static class Writer {
     /// Renders highlighted text to string.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static string Write(HighlightedText highlightedText, bool autoPage = true) {
+    public static string Write(HighlightedText highlightedText, bool autoPage = false) {
         ArgumentNullException.ThrowIfNull(highlightedText);
 
         if (highlightedText.Page || (autoPage && ShouldPage(highlightedText))) {
@@ -62,14 +73,11 @@ public static class Writer {
     public static string WriteToString(IRenderable renderable, int? width = null) {
         ArgumentNullException.ThrowIfNull(renderable);
 
-        lock (SyncRoot) {
-            StringConsole.Profile.Width = ResolveWidth(width);
+        RenderContext context = _threadContext ??= new RenderContext();
+        context.Console.Profile.Width = ResolveWidth(width);
 
-            StringConsole.Write(renderable);
-            string output = StringConsoleWriter.ToString().TrimEnd();
-            StringConsoleWriter.GetStringBuilder().Clear();
-            return output;
-        }
+        context.Console.Write(renderable);
+        return GetTrimmedOutputAndReset(context.Buffer);
     }
 
     /// <summary>
@@ -78,6 +86,17 @@ public static class Writer {
     /// </summary>
     public static string WriteToStringWithHostFallback(IRenderable renderable, int? width = null)
         => WriteToString(renderable, width);
+
+    private static string GetTrimmedOutputAndReset(StringBuilder buffer) {
+        int end = buffer.Length;
+        while (end > 0 && char.IsWhiteSpace(buffer[end - 1])) {
+            end--;
+        }
+
+        string output = end == 0 ? string.Empty : buffer.ToString(0, end);
+        buffer.Clear();
+        return output;
+    }
 
     private static IAnsiConsole CreateStringConsole(StringWriter writer) {
         var settings = new AnsiConsoleSettings {

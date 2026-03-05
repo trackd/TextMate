@@ -8,6 +8,8 @@
 public sealed class OutPageCmdlet : PSCmdlet {
     private readonly List<IRenderable> _renderables = [];
     private readonly List<object> _outStringInputs = [];
+    private HighlightedText? _singleHighlightedText;
+    private bool _sawNonHighlightedInput;
 
     /// <summary>
     /// Pipeline input to page.
@@ -28,8 +30,27 @@ public sealed class OutPageCmdlet : PSCmdlet {
 
         object value = InputObject.BaseObject;
 
+        if (value is HighlightedText highlightedText) {
+            if (_singleHighlightedText is null && !_sawNonHighlightedInput && _renderables.Count == 0 && _outStringInputs.Count == 0) {
+                _singleHighlightedText = highlightedText;
+                return;
+            }
+
+            _sawNonHighlightedInput = true;
+            _renderables.AddRange(highlightedText.Renderables);
+            return;
+        }
+
+        _sawNonHighlightedInput = true;
+
         if (value is IRenderable renderable) {
-            _renderables.Add(renderable);
+            string rendered = Writer.WriteToString(renderable, width: GetConsoleWidth());
+            if (!string.IsNullOrEmpty(rendered)) {
+                AddParagraphLines(_renderables, rendered);
+            }
+            else {
+                _renderables.Add(renderable);
+            }
             return;
         }
 
@@ -38,8 +59,8 @@ public sealed class OutPageCmdlet : PSCmdlet {
             return;
         }
 
-        if (TryConvertForeignSpectreRenderable(value, out Paragraph paragraph)) {
-            _renderables.Add(paragraph);
+        if (TryConvertForeignSpectreRenderable(value, out List<IRenderable> convertedRenderables)) {
+            _renderables.AddRange(convertedRenderables);
             return;
         }
 
@@ -50,10 +71,18 @@ public sealed class OutPageCmdlet : PSCmdlet {
     /// Runs the pager when all pipeline input has been collected.
     /// </summary>
     protected override void EndProcessing() {
+        if (_singleHighlightedText is not null && !_sawNonHighlightedInput && _renderables.Count == 0 && _outStringInputs.Count == 0) {
+            using var highlightedPager = new Pager(_singleHighlightedText);
+            highlightedPager.Show();
+            return;
+        }
+
         if (_outStringInputs.Count > 0) {
-            string formatted = ConvertWithOutString(_outStringInputs);
-            if (!string.IsNullOrEmpty(formatted)) {
-                _renderables.Add(Helpers.VTConversion.ToParagraph(formatted));
+            List<string> formattedLines = ConvertWithOutStringLines(_outStringInputs);
+            if (formattedLines.Count > 0) {
+                foreach (string line in formattedLines) {
+                    _renderables.Add(Helpers.VTConversion.ToParagraph(line));
+                }
             }
             else {
                 foreach (object value in _outStringInputs) {
@@ -70,9 +99,9 @@ public sealed class OutPageCmdlet : PSCmdlet {
         pager.Show();
     }
 
-    private static string ConvertWithOutString(List<object> values) {
+    private static List<string> ConvertWithOutStringLines(List<object> values) {
         if (values.Count == 0) {
-            return string.Empty;
+            return [];
         }
 
         OutputRendering previousOutputRendering = PSStyle.Instance.OutputRendering;
@@ -81,30 +110,41 @@ public sealed class OutPageCmdlet : PSCmdlet {
 
             using var ps = PowerShell.Create(RunspaceMode.CurrentRunspace);
             ps.AddCommand("Out-String")
+            .AddParameter("Stream")
             .AddParameter("Width", GetConsoleWidth());
 
             Collection<PSObject> results = ps.Invoke(values);
             if (ps.HadErrors || results.Count == 0) {
-                return string.Empty;
+                return [];
             }
 
-            var builder = new StringBuilder();
+            var lines = new List<string>(results.Count);
             foreach (PSObject? result in results) {
                 if (result?.BaseObject is string text) {
-                    builder.Append(text);
+                    AddLines(lines, text);
                 }
                 else {
-                    builder.Append(result?.ToString());
+                    AddLines(lines, result?.ToString() ?? string.Empty);
                 }
             }
 
-            return builder.ToString();
+            return lines;
         }
         catch {
-            return string.Empty;
+            return [];
         }
         finally {
             PSStyle.Instance.OutputRendering = previousOutputRendering;
+        }
+    }
+
+    private static void AddLines(List<string> lines, string text) {
+        string normalized = text.Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n');
+
+        string[] split = normalized.Split('\n');
+        foreach (string line in split) {
+            lines.Add(line);
         }
     }
 
@@ -117,8 +157,8 @@ public sealed class OutPageCmdlet : PSCmdlet {
         }
     }
 
-    private static bool TryConvertForeignSpectreRenderable(object value, out Paragraph paragraph) {
-        paragraph = new Paragraph();
+    private static bool TryConvertForeignSpectreRenderable(object value, out List<IRenderable> renderables) {
+        renderables = [];
 
         Type valueType = value.GetType();
         string? fullName = valueType.FullName;
@@ -133,8 +173,32 @@ public sealed class OutPageCmdlet : PSCmdlet {
             return false;
         }
 
-        paragraph = Helpers.VTConversion.ToParagraph(ansi);
-        return true;
+        renderables = ConvertAnsiToLineRenderables(ansi);
+        return renderables.Count != 0;
+    }
+
+    private static List<IRenderable> ConvertAnsiToLineRenderables(string ansi) {
+        string[] lines = ansi.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+        var renderables = new List<IRenderable>(lines.Length);
+
+        foreach (string line in lines) {
+            renderables.Add(Helpers.VTConversion.ToParagraph(line));
+        }
+
+        return renderables;
+    }
+
+    private static void AddParagraphLines(List<IRenderable> destination, string ansi) {
+        if (string.IsNullOrEmpty(ansi)) {
+            return;
+        }
+
+        List<IRenderable> lines = ConvertAnsiToLineRenderables(ansi);
+        if (lines.Count == 0) {
+            return;
+        }
+
+        destination.AddRange(lines);
     }
 
     private static string RenderForeignSpectreToAnsi(object value) {
@@ -154,7 +218,7 @@ public sealed class OutPageCmdlet : PSCmdlet {
                 return string.Empty;
             }
 
-            using var writer = new StringWriter();
+            using StringWriter writer = new(new StringBuilder(1024), CultureInfo.InvariantCulture);
             object? output = Activator.CreateInstance(ansiConsoleOutputType, writer);
             object? settings = Activator.CreateInstance(ansiConsoleSettingsType);
             PropertyInfo? outProperty = ansiConsoleSettingsType.GetProperty("Out");
