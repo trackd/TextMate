@@ -6,69 +6,68 @@ namespace PSTextMate.Sixel;
 /// <summary>
 /// Contains methods for converting an image to a Sixel format.
 /// </summary>
-public static class SixelRender {
+internal static class SixelRender {
     /// <summary>
     /// The character to use when entering a terminal escape code sequence.
     /// </summary>
-    public const char ESC = '\u001b';
+    internal const char ESC = '\u001b';
 
     /// <summary>
     /// The character to indicate the start of a sixel color palette entry or to switch to a new color.
     /// https://vt100.net/docs/vt3xx-gp/chapter14.html#S14.3.3.
     /// </summary>
-    public const char SIXELCOLOR = '#';
+    internal const char SixelColorStart = '#';
 
     /// <summary>
     /// The character to use when a sixel is empty/transparent.
     /// ? (hex 3F) represents the binary value 000000.
     /// https://vt100.net/docs/vt3xx-gp/chapter14.html#S14.2.1.
     /// </summary>
-    public const char SIXELEMPTY = '?';
+    internal const char SixelTransparent = '?';
 
     /// <summary>
     /// The character to use when entering a repeated sequence of a color in a sixel.
     /// https://vt100.net/docs/vt3xx-gp/chapter14.html#S14.3.1.
     /// </summary>
-    public const char SIXELREPEAT = '!';
+    internal const char SixelRepeat = '!';
 
     /// <summary>
     /// The character to use when moving to the next line in a sixel.
     /// https://vt100.net/docs/vt3xx-gp/chapter14.html#S14.3.5.
     /// </summary>
-    public const char SIXELDECGNL = '-';
+    internal const char SixelDECGNL = '-';
 
     /// <summary>
     /// The character to use when going back to the start of the current line in a sixel to write more data over it.
     /// https://vt100.net/docs/vt3xx-gp/chapter14.html#S14.3.4.
     /// </summary>
-    public const char SIXELDECGCR = '$';
-
+    internal const char SixelDECGCR = '$';
     /// <summary>
     /// The start of a sixel sequence.
     /// https://vt100.net/docs/vt3xx-gp/chapter14.html#S14.2.1.
     /// </summary>
-    public static readonly string SIXELSTART = $"{ESC}P0;1q";
-
+    internal static readonly string SixelStart = $"{ESC}P0;1q";
     /// <summary>
     /// The raster settings for setting the sixel pixel ratio to 1:1 so images are square when rendered instead of the 2:1 double height default.
     /// https://vt100.net/docs/vt3xx-gp/chapter14.html#S14.3.2.
     /// </summary>
-    public const string SIXELRASTERATTRIBUTES = "\"1;1;";
-
+    internal const string SixelRaster = "\"1;1;";
     /// <summary>
     /// The end of a sixel sequence.
     /// </summary>
-    public static readonly string SIXELEND = $"{ESC}\\";
+    internal static readonly string ST = $"{ESC}\\";
+    internal const string SixelColorParam = ";2;";
 
     /// <summary>
     /// The transparent color for the sixel, this is black but the sixel should be transparent so this is not visible.
     /// </summary>
-    public const string SIXELTRANSPARENTCOLOR = "#0;2;0;0;0";
+    internal const string SixelTransparentColor = "#0;2;0;0;0";
 
     /// <summary>
     /// explicit space char for clarity
     /// </summary>
-    public const char Space = ' ';
+    internal const char Space = ' ';
+    internal const char Divider = ';';
 
     /// <summary>
     /// Converts an image to a Sixel object.
@@ -160,7 +159,7 @@ public static class SixelRender {
 
                 // The value of 1 left-shifted by the remainder of the current row divided by 6 gives the correct sixel character offset from the empty sixel char for each row.
                 // See the description of s...s for more detail on the sixel format https://vt100.net/docs/vt3xx-gp/chapter14.html#S14.2.1
-                char c = (char)(SIXELEMPTY + (1 << (y % 6)));
+                char c = (char)('?' + (1 << (y % 6)));
                 int lastColor = -1;
                 int repeatCounter = 0;
 
@@ -218,12 +217,6 @@ public static class SixelRender {
         return sixelBuilder.ToString();
     }
 
-    /// <summary>
-    /// Adds a color to the sixel palette.
-    /// </summary>
-    /// <param name="sixelBuilder">The string builder to write to.</param>
-    /// <param name="pixel">The pixel to add to the palette.</param>
-    /// <param name="colorIndex">The index of the color in the palette.</param>
     private static void AddColorToPalette(this StringBuilder sixelBuilder, Rgba32 pixel, int colorIndex) {
         // rgb 0-255 needs to be translated to 0-100 for sixel.
         (int r, int g, int b) = (
@@ -232,80 +225,60 @@ public static class SixelRender {
             pixel.B * 100 / 255
         );
 
-        sixelBuilder.Append(SIXELCOLOR)
-                    .Append(colorIndex)
-                    .Append(";2;")
-                    .Append(r)
-                    .Append(';')
-                    .Append(g)
-                    .Append(';')
-                    .Append(b);
+        _ = sixelBuilder
+        .Append(SixelColorStart)
+        .Append(colorIndex)
+        .Append(SixelColorParam)
+        .Append(r)
+        .Append(Divider)
+        .Append(g)
+        .Append(Divider)
+        .Append(b);
     }
-
-    /// <summary>
-    /// Writes a repeated sixel entry to the string builder.
-    /// </summary>
-    /// <param name="sixelBuilder">The string builder to write to.</param>
-    /// <param name="colorIndex">The index of the color in the palette.</param>
-    /// <param name="repeatCounter">The number of times the color is repeated.</param>
-    /// <param name="sixel">The sixel character to write.</param>
     private static void AppendSixel(this StringBuilder sixelBuilder, int colorIndex, int repeatCounter, char sixel) {
         if (colorIndex == 0) {
             // Transparent pixels are a special case and are always 0 in the palette.
-            sixel = SIXELEMPTY;
+            sixel = SixelTransparent;
         }
         if (repeatCounter <= 1) {
             // single entry
-            sixelBuilder
-            .Append(SIXELCOLOR)
+            _ = sixelBuilder
+            .Append(SixelColorStart)
             .Append(colorIndex)
             .Append(sixel);
         }
         else {
             // add repeats
-            sixelBuilder
-            .Append(SIXELCOLOR)
+            _ = sixelBuilder
+            .Append(SixelColorStart)
             .Append(colorIndex)
-            .Append(SIXELREPEAT)
+            .Append(SixelRepeat)
             .Append(repeatCounter)
             .Append(sixel);
         }
     }
+    private static void AppendCarriageReturn(this StringBuilder sixelBuilder) {
+        _ = sixelBuilder
+        .Append(SixelDECGCR);
+    }
 
-    /// <summary>
-    /// Writes the Sixel carriage return sequence to the string builder.
-    /// </summary>
-    /// <param name="sixelBuilder">The string builder to write to.</param>
-    private static void AppendCarriageReturn(this StringBuilder sixelBuilder)
-        => sixelBuilder.Append(SIXELDECGCR);
+    private static void AppendNextLine(this StringBuilder sixelBuilder) {
+        _ = sixelBuilder
+        .Append(SixelDECGNL);
+    }
 
-    /// <summary>
-    /// Writes the Sixel next line sequence to the string builder.
-    /// </summary>
-    /// <param name="sixelBuilder">The string builder to write to.</param>
-    private static void AppendNextLine(this StringBuilder sixelBuilder)
-        => sixelBuilder.Append(SIXELDECGNL);
+    private static void AppendExitSixel(this StringBuilder sixelBuilder) {
+        _ = sixelBuilder
+        .Append(ST);
+    }
 
-    /// <summary>
-    /// Writes the Sixel exit sequence to the string builder.
-    /// </summary>
-    /// <param name="sixelBuilder">The string builder to write to.</param>
-    private static void AppendExitSixel(this StringBuilder sixelBuilder)
-        => sixelBuilder.Append(SIXELEND);
-
-    /// <summary>
-    /// Writes the Sixel start sequence to the string builder.
-    /// </summary>
-    /// <param name="sixelBuilder">The string builder to write to.</param>
-    /// <param name="width">The width of the image in pixels.</param>
-    /// <param name="height">The height of the image in pixels.</param>
     private static void StartSixel(this StringBuilder sixelBuilder, int width, int height) {
-        sixelBuilder
-        .Append(SIXELSTART)
-        .Append(SIXELRASTERATTRIBUTES)
+        _ = sixelBuilder
+        .Append(SixelStart)
+        .Append(SixelRaster)
         .Append(width)
-        .Append(';')
+        .Append(Divider)
         .Append(height)
-        .Append(SIXELTRANSPARENTCOLOR);
+        .Append(SixelTransparentColor);
     }
 }

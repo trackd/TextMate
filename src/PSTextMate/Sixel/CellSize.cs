@@ -3,7 +3,7 @@ namespace PSTextMate.Sixel;
 /// <summary>
 /// Represents terminal cell dimensions in pixels.
 /// </summary>
-public sealed class CellSize {
+internal sealed class CellSize {
     public int PixelWidth { get; init; }
 
     public int PixelHeight { get; init; }

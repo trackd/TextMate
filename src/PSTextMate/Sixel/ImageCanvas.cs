@@ -3,7 +3,7 @@ namespace PSTextMate.Sixel;
 /// <summary>
 /// Represents a renderable canvas.
 /// </summary>
-public sealed class ImageCanvas : Renderable {
+internal sealed class ImageCanvas : Renderable {
     private struct Cell {
         public char Glyph;
         public Color? Foreground;

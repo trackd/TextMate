@@ -3,7 +3,7 @@ namespace PSTextMate.Sixel;
 /// <summary>
 /// Helper methods for creating and working with sixel-related segments.
 /// </summary>
-public static class ImageSegment {
+internal static class ImageSegment {
     /// <summary>
     /// Gets a transparent segment.
     /// </summary>

@@ -85,6 +85,11 @@ public sealed class HighlightedText : Renderable {
     public bool WrapInPanel { get; set; }
 
     /// <summary>
+    /// When true, writing this renderable should use the interactive pager.
+    /// </summary>
+    public bool Page { get; set; }
+
+    /// <summary>
     /// Renders the highlighted text by combining all renderables into a single output.
     /// </summary>
     protected override IEnumerable<Segment> Render(RenderOptions options, int maxWidth) {
@@ -368,26 +373,19 @@ public sealed class HighlightedText : Renderable {
             LineNumberWidth = overrideLineNumberWidth ?? LineNumberWidth,
             GutterSeparator = GutterSeparator,
             Language = Language,
-            WrapInPanel = WrapInPanel
+            WrapInPanel = WrapInPanel,
+            Page = Page
         };
-    }
-
-    public void ShowAlternateBufferPager() {
-        if (LineCount <= 0) return;
-
-        using var pager = new Pager(this);
-        pager.Show();
     }
     public void ShowPager() {
         if (LineCount <= 0) return;
 
         using var pager = new Pager(this);
-        pager.Show(useAlternateBuffer: true);
+        pager.Show();
     }
-    public IRenderable? AutoPage(bool alternate = true) {
+    public IRenderable? AutoPage() {
         if (LineCount > Console.WindowHeight - 2) {
-            if (alternate) ShowAlternateBufferPager();
-            else ShowPager();
+            ShowPager();
             return null;
         }
         return this;
@@ -396,9 +394,9 @@ public sealed class HighlightedText : Renderable {
     /// <summary>
     /// Renders this highlighted text to a string.
     /// </summary>
-    public string Write(bool autoPage = true, bool alternatePager = true)
-        => Writer.Write(this, autoPage, alternatePager);
+    public string Write()
+        => Writer.Write(this, Page);
 
     public override string ToString()
-        => Writer.WriteToString(this, customItemFormatter: true);
+        => Writer.WriteToString(this);
 }

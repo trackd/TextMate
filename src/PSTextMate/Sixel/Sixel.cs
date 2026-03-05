@@ -11,7 +11,7 @@ namespace PSTextMate.Sixel;
 /// <param name="cellHeight">The height of a sixel image in terminal cells.</param>
 /// <param name="cellWidth">The width of a sixel image in terminal cells.</param>
 /// <param name="sixelStrings">The Sixel strings representing each frame of the image.</param>
-public readonly struct Sixel(int pixelWidth, int pixelHeight, int cellHeight, int cellWidth, string[] sixelStrings) {
+internal readonly struct Sixel(int pixelWidth, int pixelHeight, int cellHeight, int cellWidth, string[] sixelStrings) {
     /// <summary>
     /// Gets the width of a sixel image in pixels.
     /// </summary>

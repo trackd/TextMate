@@ -6,7 +6,7 @@ namespace PSTextMate.Sixel;
 /// <remarks>
 /// Initializes a new instance of the <see cref="PixelImage"/> class.
 /// </remarks>
-public sealed class PixelImage : Renderable {
+internal sealed class PixelImage : Renderable {
     private const char ESC = '\u001b';
     /// <summary>
     /// Gets the image width in pixels.

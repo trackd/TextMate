@@ -22,8 +22,14 @@ public static class Writer {
     /// Renders highlighted text to string.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static string Write(HighlightedText highlightedText, bool autoPage = true, bool alternatePager = false) {
+    public static string Write(HighlightedText highlightedText, bool autoPage = true) {
         ArgumentNullException.ThrowIfNull(highlightedText);
+
+        if (highlightedText.Page || (autoPage && ShouldPage(highlightedText))) {
+            using var pager = new Pager(highlightedText);
+            pager.Show();
+            return string.Empty;
+        }
 
         // Sixel payload must be written as raw control sequences. Converting to a string
         // and flowing through host formatting can strip DCS wrappers and print payload text.
@@ -32,10 +38,7 @@ public static class Writer {
             return string.Empty;
         }
 
-        // Keep compatibility with prior callsites while remaining side-effect free.
-        _ = autoPage;
-        _ = alternatePager;
-        return WriteToString(highlightedText, customItemFormatter: true);
+        return WriteToString(highlightedText);
     }
 
     /// <summary>
@@ -53,14 +56,14 @@ public static class Writer {
 
     /// <summary>
     /// Renders a Spectre renderable to a reusable in-memory writer.
-    /// This mirrors the PwshSpectreConsole approach so the output can be streamed
+    /// Uses a stable in-memory rendering path so the output can be streamed
     /// as plain text, redirected, or post-processed by custom formatters.
     /// </summary>
-    public static string WriteToString(IRenderable renderable, bool customItemFormatter = false, int? width = null) {
+    public static string WriteToString(IRenderable renderable, int? width = null) {
         ArgumentNullException.ThrowIfNull(renderable);
 
         lock (SyncRoot) {
-            StringConsole.Profile.Width = ResolveWidth(customItemFormatter, width);
+            StringConsole.Profile.Width = ResolveWidth(width);
 
             StringConsole.Write(renderable);
             string output = StringConsoleWriter.ToString().TrimEnd();
@@ -73,8 +76,8 @@ public static class Writer {
     /// Compatibility wrapper for previous API shape.
     /// No host-direct output is performed; this returns the rendered string only.
     /// </summary>
-    public static string WriteToStringWithHostFallback(IRenderable renderable, bool customItemFormatter = false, int? width = null)
-        => WriteToString(renderable, customItemFormatter, width);
+    public static string WriteToStringWithHostFallback(IRenderable renderable, int? width = null)
+        => WriteToString(renderable, width);
 
     private static IAnsiConsole CreateStringConsole(StringWriter writer) {
         var settings = new AnsiConsoleSettings {
@@ -84,9 +87,9 @@ public static class Writer {
         return AnsiConsole.Create(settings);
     }
 
-    private static int ResolveWidth(bool customItemFormatter, int? widthOverride) {
+    private static int ResolveWidth(int? widthOverride) {
         int width = widthOverride ?? GetConsoleWidth();
-        return customItemFormatter && width > 1 ? width - 1 : Math.Max(1, width);
+        return Math.Max(1, width);
     }
 
     private static int GetConsoleWidth() {
@@ -100,6 +103,20 @@ public static class Writer {
 
     private static bool ContainsImageRenderables(IEnumerable<IRenderable> renderables)
         => renderables.Any(IsImageRenderable);
+
+    private static bool ShouldPage(HighlightedText highlightedText) {
+        int windowHeight = GetConsoleHeight();
+        return highlightedText.LineCount > Math.Max(1, windowHeight - 2);
+    }
+
+    private static int GetConsoleHeight() {
+        try {
+            return Console.WindowHeight > 0 ? Console.WindowHeight : 40;
+        }
+        catch {
+            return 40;
+        }
+    }
 
     private static bool IsImageRenderable(IRenderable renderable) {
         string name = renderable.GetType().Name;

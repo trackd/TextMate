@@ -39,8 +39,11 @@ public abstract class TextMateCmdletBase : PSCmdlet {
     [Parameter]
     public SwitchParameter Panel { get; set; }
 
-    // [Parameter]
-    // public SwitchParameter Page { get; set; }
+    /// <summary>
+    /// When present, always render through the interactive pager.
+    /// </summary>
+    [Parameter]
+    public SwitchParameter Page { get; set; }
 
     /// <summary>
     /// Fixed language or extension token used for rendering.
@@ -161,7 +164,8 @@ public abstract class TextMateCmdletBase : PSCmdlet {
                 Renderables = renderables,
                 ShowLineNumbers = LineNumbers.IsPresent,
                 Language = token,
-                WrapInPanel = Panel.IsPresent
+                WrapInPanel = Panel.IsPresent,
+                Page = Page.IsPresent
             };
     }
 
@@ -187,7 +191,8 @@ public abstract class TextMateCmdletBase : PSCmdlet {
                 Renderables = renderables,
                 ShowLineNumbers = LineNumbers.IsPresent,
                 Language = token,
-                WrapInPanel = Panel.IsPresent
+                WrapInPanel = Panel.IsPresent,
+                Page = Page.IsPresent
             };
         }
     }

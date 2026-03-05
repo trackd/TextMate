@@ -4,7 +4,7 @@ namespace PSTextMate.Helpers;
 /// Efficient parser for VT (Virtual Terminal) escape sequences that converts them to Spectre.Console objects.
 /// Supports RGB colors, 256-color palette, 3-bit colors, and text decorations.
 /// </summary>
-public static class VTParser {
+public static class VTConversion {
     private const char ESC = '\x1B';
     private const char CSI_START = '[';
     private const char OSC_START = ']';
@@ -224,8 +224,8 @@ public static class VTParser {
                         int linkTextEnd = -1;
 
                         // Look for the closing OSC sequence: ESC]8;;ESC\
-                        while (i < span.Length - 6 && oscLength < MaxOscLength)  // Need at least 6 chars for ESC]8;;ESC\
-                        {
+                        while (i < span.Length - 6 && oscLength < MaxOscLength) {
+                            // Need at least 6 chars for ESC]8;;ESC\
                             if (span[i] == ESC && span[i + 1] == OSC_START &&
                                 span[i + 2] == '8' && span[i + 3] == ';' &&
                                 span[i + 4] == ';' && span[i + 5] == ESC &&
@@ -240,7 +240,8 @@ public static class VTParser {
                         if (linkTextEnd > linkTextStart) {
                             string linkText = span[linkTextStart..linkTextEnd].ToString();
                             style.Link = url;
-                            return new OscResult(linkTextEnd + 7, linkText); // Skip ESC]8;;ESC\
+                            // Skip ESC]8;;ESC\
+                            return new OscResult(linkTextEnd + 7, linkText);
                         }
                     }
                     else {
@@ -260,8 +261,8 @@ public static class VTParser {
             i++;
             oscLength++;
         }
-
-        return new OscResult(start + 1); // Failed to parse, advance by 1
+        // Failed to parse, advance by 1
+        return new OscResult(start + 1);
     }
 
     /// <summary>
@@ -377,16 +378,16 @@ public static class VTParser {
                     // Extended background color
                     if (i + 1 < parameters.Length) {
                         int colorType = parameters[i + 1];
-                        if (colorType == 2 && i + 4 < parameters.Length) // RGB
-                        {
+                        // RGB
+                        if (colorType == 2 && i + 4 < parameters.Length) {
                             byte r = (byte)Math.Clamp(parameters[i + 2], 0, 255);
                             byte g = (byte)Math.Clamp(parameters[i + 3], 0, 255);
                             byte b = (byte)Math.Clamp(parameters[i + 4], 0, 255);
                             style.Background = new Color(r, g, b);
                             i += 4;
                         }
-                        else if (colorType == 5 && i + 2 < parameters.Length) // 256-color
-                        {
+                        // 256-color
+                        else if (colorType == 5 && i + 2 < parameters.Length) {
                             int colorIndex = parameters[i + 2];
                             style.Background = Get256Color(colorIndex);
                             i += 2;
@@ -434,24 +435,6 @@ public static class VTParser {
         96 or 106 => Color.Aqua,
         97 or 107 => Color.White,
         _ => Color.Default
-        // 30 or 40 => Color.Black,
-        // 31 or 41 => Color.Red,
-        // 32 or 42 => Color.Green,
-        // 33 or 43 => Color.Yellow,
-        // 34 or 44 => Color.Blue,
-        // 35 or 45 => Color.Purple,
-        // 36 or 46 => Color.Teal,
-        // 37 or 47 => Color.White,
-        // 90 or 100 => Color.Grey,
-        // 91 or 101 => Color.Red1,
-        // 92 or 102 => Color.Green1,
-        // 93 or 103 => Color.Yellow1,
-        // 94 or 104 => Color.Blue1,
-        // 95 or 105 => Color.Fuchsia,
-        // 96 or 106 => Color.Aqua,
-        // 97 or 107 => Color.White,
-        // _ => Color.Default
-        // From ConvertFrom-ConsoleColor.ps1
     };
 
     /// <summary>
@@ -514,11 +497,9 @@ public static class VTParser {
         public Color? Background;
         public Decoration Decoration;
         public string? Link;
-
         public readonly bool HasAnyStyle =>
             Foreground.HasValue || Background.HasValue ||
             Decoration != Decoration.None || Link is not null;
-
         public void Reset() {
             Foreground = null;
             Background = null;

@@ -9,6 +9,7 @@ namespace PSTextMate.Utilities;
 /// - q or Escape: quit
 /// </summary>
 public sealed class Pager : IDisposable {
+    private static readonly PagerExclusivityMode s_pagerExclusivityMode = new();
     private readonly IReadOnlyList<IRenderable> _renderables;
     private readonly HighlightedText? _sourceHighlightedText;
     private readonly int? _originalLineNumberStart;
@@ -24,47 +25,51 @@ public sealed class Pager : IDisposable {
 
     private readonly record struct ViewportWindow(int Top, int Count, int EndExclusive, bool HasImages);
 
-    private bool ContainsImageRenderables() => _renderables.Any(IsImageRenderable);
+    private sealed class PagerExclusivityMode : IExclusivityMode {
+        private readonly object _syncRoot = new();
 
-    private static int? GetIntPropertyValue(object instance, string propertyName) {
-        PropertyInfo? property = instance.GetType().GetProperty(propertyName);
-        if (property is null || !property.CanRead) {
-            return null;
+        public T Run<T>(Func<T> func) {
+            ArgumentNullException.ThrowIfNull(func);
+
+            lock (_syncRoot) {
+                return func();
+            }
         }
 
-        object? value = property.GetValue(instance);
-        return value is int i ? i : null;
+        public async Task<T> RunAsync<T>(Func<Task<T>> func) {
+            ArgumentNullException.ThrowIfNull(func);
+
+            Task<T> task;
+            lock (_syncRoot) {
+                task = func();
+            }
+
+            return await task.ConfigureAwait(false);
+        }
     }
 
     private static double GetTerminalCellAspectRatio() {
-        try {
-            var compatibility = Type.GetType("PwshSpectreConsole.Terminal.Compatibility, PwshSpectreConsole");
-            MethodInfo? getCellSize = compatibility?.GetMethod("GetCellSize", Type.EmptyTypes);
-            object? cellSize = getCellSize?.Invoke(null, null);
-            if (cellSize is null) {
-                return 0.5d;
-            }
-
-            PropertyInfo? pixelWidthProperty = cellSize.GetType().GetProperty("PixelWidth");
-            PropertyInfo? pixelHeightProperty = cellSize.GetType().GetProperty("PixelHeight");
-            int pixelWidth = (int?)pixelWidthProperty?.GetValue(cellSize) ?? 0;
-            int pixelHeight = (int?)pixelHeightProperty?.GetValue(cellSize) ?? 0;
-            return pixelWidth <= 0 || pixelHeight <= 0 ? 0.5d : (double)pixelWidth / pixelHeight;
-        }
-        catch {
-            return 0.5d;
-        }
+        CellSize cellSize = Compatibility.GetCellSize();
+        return cellSize.PixelWidth <= 0 || cellSize.PixelHeight <= 0
+            ? 0.5d
+            : (double)cellSize.PixelWidth / cellSize.PixelHeight;
     }
 
     private static int EstimateImageHeight(IRenderable renderable, int width, int contentRows, RenderOptions options) {
-        // If an explicit max height exists, it is the strongest signal.
-        int? explicitMaxHeight = GetIntPropertyValue(renderable, "MaxHeight");
-        if (explicitMaxHeight.HasValue && explicitMaxHeight.Value > 0) {
-            return Math.Clamp(explicitMaxHeight.Value, 1, contentRows);
-        }
+        if (renderable is PixelImage pixelImage) {
+            int imagePixelWidth = pixelImage.Width;
+            int imagePixelHeight = pixelImage.Height;
+            int cellWidth = pixelImage.MaxWidth is int maxWidth && maxWidth > 0
+                ? Math.Min(width, maxWidth)
+                : width;
 
-        int? imagePixelWidth = GetIntPropertyValue(renderable, "Width");
-        int? imagePixelHeight = GetIntPropertyValue(renderable, "Height");
+            if (imagePixelWidth > 0 && imagePixelHeight > 0) {
+                double imageAspect = (double)imagePixelHeight / imagePixelWidth;
+                double cellAspectRatio = GetTerminalCellAspectRatio();
+                int estimatedRows = (int)Math.Ceiling(imageAspect * Math.Max(1, cellWidth) * cellAspectRatio);
+                return Math.Clamp(Math.Max(1, estimatedRows), 1, contentRows);
+            }
+        }
 
         Measurement measure;
         try {
@@ -74,16 +79,10 @@ public sealed class Pager : IDisposable {
             return Math.Clamp(contentRows, 1, contentRows);
         }
 
-        int cellWidth = Math.Max(1, Math.Min(width, measure.Max));
-        if (imagePixelWidth.HasValue && imagePixelWidth.Value > 0 && imagePixelHeight.HasValue && imagePixelHeight.Value > 0) {
-            double imageAspect = (double)imagePixelHeight.Value / imagePixelWidth.Value;
-            double cellAspectRatio = GetTerminalCellAspectRatio();
-            int estimatedRows = (int)Math.Ceiling(imageAspect * cellWidth * cellAspectRatio);
-            return Math.Clamp(Math.Max(1, estimatedRows), 1, contentRows);
-        }
+        int cellWidthFallback = Math.Max(1, Math.Min(width, measure.Max));
 
         // Last fallback: keep as atomic item, but estimate from measured width.
-        return Math.Clamp(Math.Max(1, (int)Math.Ceiling((double)measure.Max / width)), 1, contentRows);
+        return Math.Clamp(Math.Max(1, (int)Math.Ceiling((double)cellWidthFallback / Math.Max(1, width))), 1, contentRows);
     }
 
     private bool IsMarkdownSource()
@@ -159,7 +158,7 @@ public sealed class Pager : IDisposable {
         _renderables = list is null ? [] : (IReadOnlyList<IRenderable>)list;
         _top = 0;
     }
-    private void Navigate(LiveDisplayContext ctx) {
+    private void Navigate(LiveDisplayContext ctx, bool useAlternateBuffer) {
         bool running = true;
         (WindowWidth, WindowHeight) = GetPagerSize();
         bool forceRedraw = true;
@@ -175,42 +174,52 @@ public sealed class Pager : IDisposable {
 
                 WindowWidth = width;
                 WindowHeight = pageHeight;
-                VTHelpers.ReserveRow(Math.Max(1, pageHeight - 1));
+                if (useAlternateBuffer) {
+                    VTHelpers.ReserveRow(Math.Max(1, pageHeight - 1));
+                }
                 forceRedraw = true;
             }
 
             // Redraw if needed (initial, resize, or after navigation)
             if (resized || forceRedraw) {
-                RecalculateRenderableHeights(width, contentRows);
-                _top = Math.Clamp(_top, 0, GetMaxTop(contentRows));
-                ViewportWindow viewport = BuildViewport(_top, contentRows);
-                _top = viewport.Top;
+                VTHelpers.BeginSynchronizedOutput();
+                try {
+                    RecalculateRenderableHeights(width, contentRows);
+                    _top = Math.Clamp(_top, 0, GetMaxTop(contentRows));
+                    ViewportWindow viewport = BuildViewport(_top, contentRows);
+                    _top = viewport.Top;
 
-                bool fullClear = resized || viewport.HasImages || _lastPageHadImages;
-                if (fullClear) {
-                    VTHelpers.ClearScreen();
-                    VTHelpers.ReserveRow(contentRows);
-                }
-                else {
-                    VTHelpers.SetCursorPosition(1, 1);
-                }
-
-                IRenderable target = BuildRenderable(viewport);
-                ctx.UpdateTarget(target);
-                ctx.Refresh();
-
-                DrawFooter(width, contentRows, viewport);
-
-                // Clear any previously-rendered lines that are now beyond contentRows.
-                if (_lastRenderedRows > contentRows) {
-                    for (int r = contentRows + 1; r <= _lastRenderedRows; r++) {
-                        VTHelpers.ClearRow(r);
+                    bool fullClear = resized || viewport.HasImages || _lastPageHadImages;
+                    if (fullClear) {
+                        VTHelpers.ClearScreen();
+                        if (useAlternateBuffer) {
+                            VTHelpers.ReserveRow(contentRows);
+                        }
                     }
-                }
+                    else {
+                        VTHelpers.SetCursorPosition(1, 1);
+                    }
 
-                _lastRenderedRows = contentRows;
-                _lastPageHadImages = viewport.HasImages;
-                forceRedraw = false;
+                    IRenderable target = BuildRenderable(viewport);
+                    ctx.UpdateTarget(target);
+                    ctx.Refresh();
+
+                    DrawFooter(width, contentRows, viewport);
+
+                    // Clear any previously-rendered lines that are now beyond contentRows.
+                    if (_lastRenderedRows > contentRows) {
+                        for (int r = contentRows + 1; r <= _lastRenderedRows; r++) {
+                            VTHelpers.ClearRow(r);
+                        }
+                    }
+
+                    _lastRenderedRows = contentRows;
+                    _lastPageHadImages = viewport.HasImages;
+                    forceRedraw = false;
+                }
+                finally {
+                    VTHelpers.EndSynchronizedOutput();
+                }
             }
 
             // Wait for input, checking for resize while idle
@@ -326,6 +335,13 @@ public sealed class Pager : IDisposable {
             }
 
             if (IsImageRenderable(r)) {
+                if (r is PixelImage pixelImage) {
+                    // In pager mode, clamp image width to the viewport so frames stay within screen bounds.
+                    pixelImage.MaxWidth = pixelImage.MaxWidth is int existingWidth && existingWidth > 0
+                        ? Math.Min(existingWidth, width)
+                        : width;
+                }
+
                 _renderableHeights.Add(EstimateImageHeight(r, width, contentRows, options));
                 continue;
             }
@@ -390,7 +406,7 @@ public sealed class Pager : IDisposable {
         int pos = total == 0 ? 0 : viewport.Top + 1;
         int end = viewport.EndExclusive;
 
-        string keys = "Up/Down: ↑↓  PgUp/PgDn: PgUp/PgDn/Spacebar  Home/End: Home/End  q/Esc: Quit";
+        string keys = "Up/Down: ↑↓  PgUp/PgDn/Spacebar  Home/End  q/Esc: Quit";
         string status = $" {pos}-{end}/{total} ";
         int remaining = Math.Max(0, width - keys.Length - status.Length - 2);
         string spacer = new(' ', remaining);
@@ -403,97 +419,24 @@ public sealed class Pager : IDisposable {
         Console.Write(line.PadRight(width));
     }
 
-    private void NavigateDirect(bool useAlternateBuffer) {
-        bool running = true;
-        (WindowWidth, WindowHeight) = GetPagerSize();
-        bool forceRedraw = true;
+    public void Show() {
+        bool resolvedUseAlternateBuffer = VTHelpers.SupportsAlternateBuffer();
 
-        while (running) {
-            (int width, int pageHeight) = GetPagerSize();
-            int contentRows = Math.Max(1, pageHeight - 1);
-
-            bool resized = width != WindowWidth || pageHeight != WindowHeight;
-            if (resized) {
-                AnsiConsole.Console.Profile.Width = width;
-                WindowWidth = width;
-                WindowHeight = pageHeight;
-                forceRedraw = true;
+        s_pagerExclusivityMode.Run(() => {
+            if (resolvedUseAlternateBuffer) {
+                AnsiConsole.Console.AlternateScreen(() => ShowCore(useAlternateBuffer: true));
+            }
+            else {
+                ShowCore(useAlternateBuffer: false);
             }
 
-            if (resized || forceRedraw) {
-                RecalculateRenderableHeights(width, contentRows);
-                _top = Math.Clamp(_top, 0, GetMaxTop(contentRows));
-                ViewportWindow viewport = BuildViewport(_top, contentRows);
-                _top = viewport.Top;
-
-                VTHelpers.ClearScreen();
-                if (useAlternateBuffer) {
-                    VTHelpers.ReserveRow(contentRows);
-                }
-
-                IRenderable target = BuildRenderable(viewport);
-                AnsiConsole.Write(target);
-                DrawFooter(width, contentRows, viewport);
-                forceRedraw = false;
-            }
-
-            if (!Console.KeyAvailable) {
-                Thread.Sleep(50);
-                continue;
-            }
-
-            ConsoleKeyInfo key = Console.ReadKey(true);
-            lock (_lock) {
-                switch (key.Key) {
-                    case ConsoleKey.DownArrow:
-                        ScrollRenderable(1);
-                        forceRedraw = true;
-                        break;
-                    case ConsoleKey.UpArrow:
-                        ScrollRenderable(-1);
-                        forceRedraw = true;
-                        break;
-                    case ConsoleKey.Spacebar:
-                    case ConsoleKey.PageDown:
-                        PageDown(contentRows);
-                        forceRedraw = true;
-                        break;
-                    case ConsoleKey.PageUp:
-                        PageUp(contentRows);
-                        forceRedraw = true;
-                        break;
-                    case ConsoleKey.Home:
-                        GoToTop();
-                        forceRedraw = true;
-                        break;
-                    case ConsoleKey.End:
-                        GoToEnd(contentRows);
-                        forceRedraw = true;
-                        break;
-                    case ConsoleKey.Q:
-                    case ConsoleKey.Escape:
-                        running = false;
-                        break;
-                }
-            }
-        }
+            return 0;
+        });
     }
 
-    public void Show() => Show(useAlternateBuffer: true);
-
-    public void Show(bool useAlternateBuffer) {
-        if (useAlternateBuffer) {
-            VTHelpers.EnterAlternateBuffer();
-        }
+    private void ShowCore(bool useAlternateBuffer) {
         VTHelpers.HideCursor();
         try {
-            // Sixel/pixel renderables are safest when written directly because
-            // Live's diff/crop pass can interfere with terminal image sequences.
-            if (ContainsImageRenderables()) {
-                NavigateDirect(useAlternateBuffer);
-                return;
-            }
-
             (int width, int pageHeight) = GetPagerSize();
             int contentRows = Math.Max(1, pageHeight - 1);
 
@@ -513,12 +456,18 @@ public sealed class Pager : IDisposable {
 
             // If the initial page contains images, clear appropriately to ensure safe image rendering
             if (initialViewport.HasImages) {
-                if (useAlternateBuffer) {
-                    VTHelpers.ClearScreen();
-                    VTHelpers.ReserveRow(Math.Max(1, pageHeight - 1));
+                VTHelpers.BeginSynchronizedOutput();
+                try {
+                    if (useAlternateBuffer) {
+                        VTHelpers.ClearScreen();
+                        VTHelpers.ReserveRow(Math.Max(1, pageHeight - 1));
+                    }
+                    else {
+                        VTHelpers.ClearScreen();
+                    }
                 }
-                else {
-                    VTHelpers.ClearScreen();
+                finally {
+                    VTHelpers.EndSynchronizedOutput();
                 }
             }
 
@@ -530,7 +479,7 @@ public sealed class Pager : IDisposable {
                 // Draw footer once before entering the interactive loop
                 DrawFooter(width, contentRows, initialViewport);
                 // Enter interactive loop using the live display context
-                Navigate(ctx);
+                Navigate(ctx, useAlternateBuffer);
             });
         }
         finally {
@@ -545,7 +494,6 @@ public sealed class Pager : IDisposable {
             // Reset scroll region and restore normal screen buffer if used
             if (useAlternateBuffer) {
                 VTHelpers.ResetScrollRegion();
-                VTHelpers.ExitAlternateBuffer();
             }
             VTHelpers.ShowCursor();
         }
