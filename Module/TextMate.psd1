@@ -1,6 +1,6 @@
 @{
     RootModule           = 'TextMate.psm1'
-    ModuleVersion        = '0.1.0'
+    ModuleVersion        = '0.2.0'
     GUID                 = 'fe78d2cb-2418-4308-9309-a0850e504cd6'
     Author               = 'trackd'
     CompanyName          = 'trackd'
@@ -25,7 +25,13 @@
         'Show-TextMate'
     )
     FormatsToProcess     = 'TextMate.format.ps1xml'
-    RequiredModules      = @()
+    RequiredModules      = @(
+        @{
+            ModuleName     = 'PwshSpectreConsole'
+            ModuleVersion  = '2.6.3'
+            MaximumVersion = '2.99.99'
+        }
+    )
     PrivateData          = @{
         PSData = @{
             Tags       = 'Windows', 'Linux', 'OSX', 'TextMate', 'Markdown', 'SyntaxHighlighting'

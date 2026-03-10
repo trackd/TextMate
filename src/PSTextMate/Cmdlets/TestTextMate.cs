@@ -13,6 +13,7 @@ public sealed class TestTextMateCmdlet : PSCmdlet {
     /// </summary>
     [Parameter(
         ParameterSetName = "ExtensionSet",
+        ValueFromPipelineByPropertyName = true,
         Mandatory = true
     )]
     [ValidateNotNullOrEmpty]
@@ -23,6 +24,7 @@ public sealed class TestTextMateCmdlet : PSCmdlet {
     /// </summary>
     [Parameter(
         ParameterSetName = "LanguageSet",
+        ValueFromPipelineByPropertyName = true,
         Mandatory = true
     )]
     [ValidateNotNullOrEmpty]
@@ -33,15 +35,18 @@ public sealed class TestTextMateCmdlet : PSCmdlet {
     /// </summary>
     [Parameter(
         ParameterSetName = "FileSet",
-        Mandatory = true
+        ValueFromPipelineByPropertyName = true,
+        Mandatory = true,
+        Position = 0
     )]
+    [Alias("Path")]
     [ValidateNotNullOrEmpty]
     public string? File { get; set; }
 
     /// <summary>
     /// Finalizes processing and outputs support check results.
     /// </summary>
-    protected override void EndProcessing() {
+    protected override void ProcessRecord() {
         switch (ParameterSetName) {
             case "FileSet":
                 FileInfo filePath = new(GetUnresolvedProviderPathFromPSPath(File!));

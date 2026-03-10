@@ -21,6 +21,7 @@ What it does
 | [Format-PowerShell](docs/en-us/Format-PowerShell.md) | Highlight PowerShell code |
 | [Get-TextMateGrammar](docs/en-us/Get-TextMateGrammar.md) | List available grammars and file extensions. |
 | [Test-TextMate](docs/en-us/Test-TextMate.md) | Check support for a file, extension, or language ID. |
+| [Out-Page](docs/en-us/Out-Page.md) | Builtin terminal pager |
 
 ```note
 Format-CSharp/Markdown/Powershell is just sugar for Format-TextMate -Language CSharp/PowerShell/Markdown

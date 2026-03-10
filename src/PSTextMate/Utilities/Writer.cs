@@ -9,7 +9,6 @@ public static class Writer {
         public StringBuilder Buffer { get; }
         public StringWriter Writer { get; }
         public IAnsiConsole Console { get; }
-
         public RenderContext() {
             Buffer = new StringBuilder(2048);
             Writer = new StringWriter(Buffer, CultureInfo.InvariantCulture);

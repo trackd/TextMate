@@ -1,4 +1,4 @@
-﻿namespace PSTextMate.Commands;
+namespace PSTextMate.Commands;
 
 /// <summary>
 /// Sends renderables or VT-formatted strings to the interactive pager.
@@ -6,23 +6,16 @@
 [Cmdlet(VerbsData.Out, "Page")]
 [OutputType(typeof(void))]
 public sealed class OutPageCmdlet : PSCmdlet {
+    private const char Escape = '\x1B';
     private readonly List<IRenderable> _renderables = [];
     private readonly List<object> _outStringInputs = [];
     private HighlightedText? _singleHighlightedText;
     private bool _sawNonHighlightedInput;
 
-    /// <summary>
-    /// Pipeline input to page.
-    /// Accepts <see cref="IRenderable"/> values directly, or strings that are
-    /// converted through <see cref="Helpers.VTConversion.ToParagraph(string)"/>.
-    /// </summary>
     [Parameter(Mandatory = true, ValueFromPipeline = true, Position = 0)]
-    [AllowNull]
+    [System.Management.Automation.AllowNull]
     public PSObject? InputObject { get; set; }
 
-    /// <summary>
-    /// Processes one input object from the pipeline.
-    /// </summary>
     protected override void ProcessRecord() {
         if (InputObject?.BaseObject is null) {
             WriteVerbose("ProcessRecord: InputObject is null; skipping item.");
@@ -30,7 +23,7 @@ public sealed class OutPageCmdlet : PSCmdlet {
         }
 
         object value = InputObject.BaseObject;
-        WriteVerbose($"ProcessRecord: received input type '{value.GetType().FullName}'.");
+        WriteVerbose($"ProcessRecord: received input type '{value.GetType().FullName}' BaseType: '{value.GetType().BaseType}'.");
 
         if (value is HighlightedText highlightedText) {
             if (_singleHighlightedText is null && !_sawNonHighlightedInput && _renderables.Count == 0 && _outStringInputs.Count == 0) {
@@ -48,16 +41,8 @@ public sealed class OutPageCmdlet : PSCmdlet {
         _sawNonHighlightedInput = true;
 
         if (value is IRenderable renderable) {
-            string rendered = Writer.WriteToString(renderable, width: GetConsoleWidth());
-            if (!string.IsNullOrEmpty(rendered)) {
-                AddParagraphLines(_renderables, rendered);
-                WriteVerbose("ProcessRecord: input matched IRenderable and was expanded into paragraph lines.");
-            }
-            else {
-                _renderables.Add(renderable);
-                WriteVerbose("ProcessRecord: input matched IRenderable and was added as-is.");
-            }
-
+            _renderables.Add(renderable);
+            WriteVerbose("ProcessRecord: input matched IRenderable and was added directly.");
             return;
         }
 
@@ -67,37 +52,25 @@ public sealed class OutPageCmdlet : PSCmdlet {
             return;
         }
 
-        if (value is Renderable renderable1) {
-            _renderables.Add(renderable1);
-            WriteVerbose("ProcessRecord: input matched Renderable concrete type; added directly.");
+        if (TryConvertForeignSpectreRenderable(value, out IRenderable? convertedRenderable)) {
+            _renderables.Add(convertedRenderable);
+            WriteVerbose("ProcessRecord: converted foreign Spectre renderable to local IRenderable.");
             return;
         }
 
-        try {
-            var r = (Renderable)value;
-            if (r is not null) {
-                _renderables.Add(r);
-                WriteVerbose("ProcessRecord: input cast to Renderable successfully; added directly.");
-                return;
-            }
-        }
-        catch {
-            WriteVerbose("ProcessRecord: direct Renderable cast failed; continuing with foreign conversion attempt.");
-        }
-
-        if (TryConvertForeignSpectreRenderable(value, out List<IRenderable> convertedRenderables)) {
-            _renderables.AddRange(convertedRenderables);
-            WriteVerbose($"ProcessRecord: converted foreign Spectre renderable into {convertedRenderables.Count} line renderables.");
-            return;
+        if (IsSpectreObject(value)) {
+            string localAssembly = typeof(IRenderable).Assembly.FullName ?? "<unknown>";
+            string foreignAssembly = value.GetType().Assembly.FullName ?? "<unknown>";
+            WriteVerbose(
+                $"ProcessRecord: Spectre object conversion failed (local='{localAssembly}', foreign='{foreignAssembly}'). "
+                + "This usually indicates duplicate Spectre.Console assemblies loaded in different contexts; restart the session after updating the module."
+            );
         }
 
         _outStringInputs.Add(value);
         WriteVerbose("ProcessRecord: no renderable conversion path matched; queued object for Out-String conversion.");
     }
 
-    /// <summary>
-    /// Runs the pager when all pipeline input has been collected.
-    /// </summary>
     protected override void EndProcessing() {
         if (_singleHighlightedText is not null && !_sawNonHighlightedInput && _renderables.Count == 0 && _outStringInputs.Count == 0) {
             WriteVerbose("EndProcessing: using single HighlightedText pager path.");
@@ -111,7 +84,9 @@ public sealed class OutPageCmdlet : PSCmdlet {
             List<string> formattedLines = ConvertWithOutStringLines(_outStringInputs);
             if (formattedLines.Count > 0) {
                 foreach (string line in formattedLines) {
-                    _renderables.Add(Helpers.VTConversion.ToParagraph(line));
+                    _renderables.Add(line.Length == 0
+                        ? new Text(string.Empty)
+                        : Helpers.VTConversion.ToParagraph(line));
                 }
 
                 WriteVerbose($"EndProcessing: Out-String produced {formattedLines.Count} line(s) for paging.");
@@ -147,7 +122,7 @@ public sealed class OutPageCmdlet : PSCmdlet {
             using var ps = PowerShell.Create(RunspaceMode.CurrentRunspace);
             ps.AddCommand("Out-String")
             .AddParameter("Stream")
-            .AddParameter("Width", GetConsoleWidth());
+            .AddParameter("Width", GetOutStringWidth());
 
             Collection<PSObject> results = ps.Invoke(values);
             if (ps.HadErrors || results.Count == 0) {
@@ -164,6 +139,7 @@ public sealed class OutPageCmdlet : PSCmdlet {
                 }
             }
 
+            // TrimBoundaryEmptyLines(lines);
             return lines;
         }
         catch {
@@ -178,8 +154,18 @@ public sealed class OutPageCmdlet : PSCmdlet {
         string normalized = text.Replace("\r\n", "\n", StringComparison.Ordinal)
             .Replace('\r', '\n');
 
-        foreach (string line in normalized.Split('\n')) {
-            lines.Add(line);
+        string[] split = normalized.Split('\n');
+        int count = split.Length;
+
+        // Out-String -Stream commonly returns one chunk per logical line with a
+        // trailing newline terminator. Ignore only that terminator-induced empty
+        // entry so pager row counts match what is actually rendered.
+        if (count > 0 && split[^1].Length == 0 && normalized.EndsWith('\n')) {
+            count--;
+        }
+
+        for (int i = 0; i < count; i++) {
+            lines.Add(split[i]);
         }
     }
 
@@ -192,112 +178,30 @@ public sealed class OutPageCmdlet : PSCmdlet {
         }
     }
 
-    private static bool TryConvertForeignSpectreRenderable(object value, out List<IRenderable> renderables) {
-        renderables = [];
+    // Keep one-column slack so width-bound lines from Out-String do not
+    // wrap in the live pager viewport and skew row-height calculations.
+    private static int GetOutStringWidth() => Math.Max(20, GetConsoleWidth() - 1);
+
+    private static bool TryConvertForeignSpectreRenderable(
+        object value,
+        [NotNullWhen(true)] out IRenderable? renderable
+    ) {
+        renderable = null;
 
         Type valueType = value.GetType();
         string? fullName = valueType.FullName;
-        if (string.IsNullOrWhiteSpace(fullName)
-            || !fullName.StartsWith("Spectre.Console.", StringComparison.Ordinal)
-            || value is IRenderable) {
-            return false;
-        }
-
-        string ansi = RenderForeignSpectreToAnsi(value);
-        if (string.IsNullOrEmpty(ansi)) {
-            return false;
-        }
-
-        renderables = ConvertAnsiToLineRenderables(ansi);
-        return renderables.Count != 0;
+        return IsSpectreObject(fullName)
+            && value is not IRenderable
+            && SpectreRenderBridge.TryConvertToLocalRenderable(value, out renderable);
     }
 
-    private static List<IRenderable> ConvertAnsiToLineRenderables(string ansi) {
-        string[] lines = ansi.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
-        var renderables = new List<IRenderable>(lines.Length);
-
-        foreach (string line in lines) {
-            renderables.Add(Helpers.VTConversion.ToParagraph(line));
-        }
-
-        return renderables;
+    private static bool IsSpectreObject(object value) {
+        string? fullName = value.GetType().FullName;
+        return IsSpectreObject(fullName);
     }
-
-    private static void AddParagraphLines(List<IRenderable> destination, string ansi) {
-        if (string.IsNullOrEmpty(ansi)) {
-            return;
-        }
-
-        List<IRenderable> lines = ConvertAnsiToLineRenderables(ansi);
-        if (lines.Count == 0) {
-            return;
-        }
-
-        destination.AddRange(lines);
+    private static bool IsSpectreObject(string? str) {
+        return !string.IsNullOrWhiteSpace(str)
+            && (str.StartsWith("Spectre.Console.", StringComparison.Ordinal) ||
+            str.StartsWith("PwshSpectreConsole.", StringComparison.Ordinal));
     }
-
-    private static string RenderForeignSpectreToAnsi(object value) {
-        try {
-            Assembly assembly = value.GetType().Assembly;
-            Type? ansiConsoleType = assembly.GetType("Spectre.Console.AnsiConsole");
-            Type? ansiConsoleSettingsType = assembly.GetType("Spectre.Console.AnsiConsoleSettings");
-            Type? ansiConsoleOutputType = assembly.GetType("Spectre.Console.AnsiConsoleOutput");
-            Type? renderableType = assembly.GetType("Spectre.Console.Rendering.IRenderable")
-                ?? assembly.GetType("Spectre.Console.IRenderable");
-
-            if (ansiConsoleType is null
-                || ansiConsoleSettingsType is null
-                || ansiConsoleOutputType is null
-                || renderableType?.IsInstanceOfType(value) != true) {
-                return string.Empty;
-            }
-
-            using StringWriter writer = new(new StringBuilder(1024), CultureInfo.InvariantCulture);
-            object? output = Activator.CreateInstance(ansiConsoleOutputType, writer);
-            object? settings = Activator.CreateInstance(ansiConsoleSettingsType);
-            PropertyInfo? outProperty = ansiConsoleSettingsType.GetProperty("Out");
-
-            if (output is null || settings is null || outProperty is null || !outProperty.CanWrite) {
-                return string.Empty;
-            }
-
-            outProperty.SetValue(settings, output);
-
-            MethodInfo? createMethod = ansiConsoleType
-                .GetMethods(BindingFlags.Public | BindingFlags.Static)
-                .FirstOrDefault(method => method.Name == "Create"
-                    && method.GetParameters() is { Length: 1 } parameters
-                    && parameters[0].ParameterType == ansiConsoleSettingsType);
-
-            object? console = createMethod?.Invoke(null, [settings]);
-            if (console is null) {
-                return string.Empty;
-            }
-
-            MethodInfo? writeMethod = console.GetType().GetMethod("Write", [renderableType]);
-            if (writeMethod is not null) {
-                _ = writeMethod.Invoke(console, [value]);
-            }
-            else {
-                Type? extType = assembly.GetType("Spectre.Console.AnsiConsoleExtensions");
-                MethodInfo? extWriteMethod = extType?
-                    .GetMethods(BindingFlags.Public | BindingFlags.Static)
-                    .FirstOrDefault(method => method.Name == "Write"
-                        && method.GetParameters() is { Length: 2 } parameters
-                        && parameters[1].ParameterType == renderableType);
-
-                if (extWriteMethod is null) {
-                    return string.Empty;
-                }
-
-                _ = extWriteMethod.Invoke(null, [console, value]);
-            }
-
-            return writer.ToString();
-        }
-        catch {
-            return string.Empty;
-        }
-    }
-
 }

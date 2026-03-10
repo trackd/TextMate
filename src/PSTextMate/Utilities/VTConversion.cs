@@ -9,6 +9,11 @@ public static class VTConversion {
     private const char CSI_START = '[';
     private const char OSC_START = ']';
     private const char SGR_END = 'm';
+    private enum ForeignImageType {
+        Sixel,
+        IIP,
+        Kitty
+    }
 
     /// <summary>
     /// Parses a string containing VT escape sequences and returns a Paragraph object.

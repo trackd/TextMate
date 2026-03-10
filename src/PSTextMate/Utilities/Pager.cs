@@ -16,6 +16,7 @@ public sealed class Pager : IDisposable {
     private readonly int? _originalLineNumberWidth;
     private readonly bool? _originalWrapInPanel;
     private readonly int? _stableLineNumberWidth;
+    private readonly int _statusColumnWidth;
     private int _top;
     private int WindowHeight;
     private int WindowWidth;
@@ -24,6 +25,24 @@ public sealed class Pager : IDisposable {
     private List<int> _renderableHeights = [];
     private bool _lastPageHadImages;
     private readonly record struct ViewportWindow(int Top, int Count, int EndExclusive, bool HasImages);
+
+    private bool UseRichFooter(int footerWidth)
+        => footerWidth >= GetMinimumRichFooterWidth();
+
+    private int GetFooterHeight(int footerWidth)
+        => UseRichFooter(footerWidth) ? 3 : 1;
+
+    private int GetMinimumRichFooterWidth() {
+        const int keySectionMinWidth = 38;
+        const int chartSectionMinWidth = 12;
+        const int layoutOverhead = 10;
+        return keySectionMinWidth + _statusColumnWidth + chartSectionMinWidth + layoutOverhead;
+    }
+
+    private static int GetStatusColumnWidth(int totalItems) {
+        int digits = Math.Max(1, totalItems.ToString(CultureInfo.InvariantCulture).Length);
+        return (digits * 3) + 4;
+    }
 
     private sealed class PagerExclusivityMode : IExclusivityMode {
         private readonly object _syncRoot = new();
@@ -154,12 +173,14 @@ public sealed class Pager : IDisposable {
 
         // Reference the underlying renderable array directly to avoid copying.
         _renderables = highlightedText.Renderables;
+        _statusColumnWidth = GetStatusColumnWidth(_renderables.Count);
         _top = 0;
     }
 
     public Pager(IEnumerable<IRenderable> renderables) {
         var list = renderables?.ToList();
         _renderables = list is null ? [] : (IReadOnlyList<IRenderable>)list;
+        _statusColumnWidth = GetStatusColumnWidth(_renderables.Count);
         _top = 0;
     }
     private void Navigate(LiveDisplayContext ctx, bool useAlternateBuffer) {
@@ -169,8 +190,8 @@ public sealed class Pager : IDisposable {
 
         while (running) {
             (int width, int pageHeight) = GetPagerSize();
-            // Reserve last row for footer
-            int contentRows = Math.Max(1, pageHeight - 1);
+            int footerHeight = GetFooterHeight(width);
+            int contentRows = Math.Max(1, pageHeight - footerHeight);
 
             bool resized = width != WindowWidth || pageHeight != WindowHeight;
             if (resized) {
@@ -178,9 +199,6 @@ public sealed class Pager : IDisposable {
 
                 WindowWidth = width;
                 WindowHeight = pageHeight;
-                if (useAlternateBuffer) {
-                    VTHelpers.ReserveRow(Math.Max(1, pageHeight - 1));
-                }
                 forceRedraw = true;
             }
 
@@ -196,28 +214,23 @@ public sealed class Pager : IDisposable {
                     bool fullClear = resized || viewport.HasImages || _lastPageHadImages;
                     if (fullClear) {
                         VTHelpers.ClearScreen();
-                        if (useAlternateBuffer) {
-                            VTHelpers.ReserveRow(contentRows);
-                        }
                     }
                     else {
                         VTHelpers.SetCursorPosition(1, 1);
                     }
 
-                    IRenderable target = BuildRenderable(viewport);
+                    IRenderable target = BuildRenderable(viewport, width);
                     ctx.UpdateTarget(target);
                     ctx.Refresh();
 
-                    DrawFooter(width, contentRows, viewport);
-
-                    // Clear any previously-rendered lines that are now beyond contentRows.
-                    if (_lastRenderedRows > contentRows) {
-                        for (int r = contentRows + 1; r <= _lastRenderedRows; r++) {
+                    // Clear any stale lines after a terminal shrink.
+                    if (_lastRenderedRows > pageHeight) {
+                        for (int r = pageHeight + 1; r <= _lastRenderedRows; r++) {
                             VTHelpers.ClearRow(r);
                         }
                     }
 
-                    _lastRenderedRows = contentRows;
+                    _lastRenderedRows = pageHeight;
                     _lastPageHadImages = viewport.HasImages;
                     forceRedraw = false;
                 }
@@ -389,38 +402,78 @@ public sealed class Pager : IDisposable {
 
     private void GoToEnd(int contentRows) => _top = GetMaxTop(contentRows);
 
-    private IRenderable BuildRenderable(ViewportWindow viewport) {
-        if (viewport.Count <= 0) {
-            return new Rows([]);
-        }
+    private Layout BuildRenderable(ViewportWindow viewport, int width) {
+        int footerHeight = GetFooterHeight(width);
+        IRenderable content = viewport.Count <= 0
+            ? Text.Empty
+            : BuildContentRenderable(viewport);
 
+        IRenderable footer = BuildFooter(width, viewport);
+        var root = new Layout("root");
+        root.SplitRows(
+            new Layout("body").Update(content),
+            new Layout("footer").Size(footerHeight).Update(footer)
+        );
+
+        return root;
+    }
+
+    private IRenderable BuildContentRenderable(ViewportWindow viewport) {
         if (_sourceHighlightedText is not null) {
             _sourceHighlightedText.SetView(_renderables, viewport.Top, viewport.Count);
             _sourceHighlightedText.LineNumberStart = (_originalLineNumberStart ?? 1) + viewport.Top;
             _sourceHighlightedText.LineNumberWidth = _stableLineNumberWidth;
-
             return _sourceHighlightedText;
         }
 
         return new Rows(_renderables.Skip(viewport.Top).Take(viewport.Count));
     }
 
-    private void DrawFooter(int width, int contentRows, ViewportWindow viewport) {
+    private IRenderable BuildFooter(int width, ViewportWindow viewport)
+        => UseRichFooter(width)
+            ? BuildRichFooter(width, viewport)
+            : BuildSimpleFooter(viewport);
+
+    private Text BuildSimpleFooter(ViewportWindow viewport) {
         int total = _renderables.Count;
-        int pos = total == 0 ? 0 : viewport.Top + 1;
+        int start = total == 0 ? 0 : viewport.Top + 1;
         int end = viewport.EndExclusive;
+        return new Text($"↑↓ Scroll  PgUp/PgDn Page  Home/End Jump  q/Esc Quit    {start}-{end}/{total}", new Style(Color.Grey));
+    }
 
-        string keys = "Up/Down: ↑↓  PgUp/PgDn/Spacebar  Home/End  q/Esc: Quit";
-        string status = $" {pos}-{end}/{total} ";
-        int remaining = Math.Max(0, width - keys.Length - status.Length - 2);
-        string spacer = new(' ', remaining);
-        string line = keys + spacer + status;
-        if (line.Length > width) line = line[..width];
+    private Panel BuildRichFooter(int width, ViewportWindow viewport) {
+        int total = _renderables.Count;
+        int start = total == 0 ? 0 : viewport.Top + 1;
+        int end = viewport.EndExclusive;
+        int safeTotal = Math.Max(1, total);
+        int digits = Math.Max(1, safeTotal.ToString(CultureInfo.InvariantCulture).Length);
 
-        // Write footer directly to reserved row (contentRows + 1)
-        int footerRow = contentRows + 1;
-        VTHelpers.SetCursorPosition(footerRow, 1);
-        Console.Write(line.PadRight(width));
+        string keyText = "↑↓ Scroll  PgUp/PgDn Page  Home/End Jump  q/Esc Quit";
+        string statusText = $"{start.ToString(CultureInfo.InvariantCulture).PadLeft(digits)}-{end.ToString(CultureInfo.InvariantCulture).PadLeft(digits)}/{total.ToString(CultureInfo.InvariantCulture).PadLeft(digits)}".PadLeft(_statusColumnWidth);
+
+        int chartWidth = Math.Clamp(width / 5, 12, 28);
+        double progressUnits = total == 0 ? 0d : (double)end / safeTotal * chartWidth;
+        double chartValue = end <= 0 ? 0d : Math.Clamp(Math.Ceiling(progressUnits), Math.Min(4d, chartWidth), chartWidth);
+        BarChart chart = new BarChart()
+            .Width(chartWidth)
+            .WithMaxValue(chartWidth)
+            .HideValues()
+            .AddItem(" ", chartValue, Color.Lime);
+
+        Columns columns = new([
+            new Text(keyText, new Style(Color.Grey)),
+            new Markup($"[bold]{statusText}[/]"),
+            chart
+        ]) {
+            Expand = true,
+            Padding = new Padding(2, 0, 2, 0)
+        };
+
+        return new Panel(columns) {
+            Border = BoxBorder.Rounded,
+            Padding = new Padding(0, 0, 0, 0),
+            Expand = true
+        };
     }
 
     public void Show() {
@@ -442,22 +495,18 @@ public sealed class Pager : IDisposable {
         VTHelpers.HideCursor();
         try {
             (int width, int pageHeight) = GetPagerSize();
-            int contentRows = Math.Max(1, pageHeight - 1);
+            int footerHeight = GetFooterHeight(width);
+            int contentRows = Math.Max(1, pageHeight - footerHeight);
             WindowWidth = width;
             WindowHeight = pageHeight;
 
-            // Start with a clean screen then reserve the last row as a non-scrolling footer region
-            if (useAlternateBuffer) {
-                VTHelpers.ReserveRow(Math.Max(1, pageHeight - 1));
-            }
-
-            // Initial target for Spectre Live (footer is drawn manually)
+            // Initial target for Spectre Live (footer included in target renderable)
             AnsiConsole.Console.Profile.Width = width;
             RecalculateRenderableHeights(width, contentRows);
             ViewportWindow initialViewport = BuildViewport(_top, contentRows);
             _top = initialViewport.Top;
-            IRenderable initial = BuildRenderable(initialViewport);
-            _lastRenderedRows = contentRows;
+            IRenderable initial = BuildRenderable(initialViewport, width);
+            _lastRenderedRows = pageHeight;
             _lastPageHadImages = initialViewport.HasImages;
 
             // If the initial page contains images, clear appropriately to ensure safe image rendering
@@ -466,7 +515,6 @@ public sealed class Pager : IDisposable {
                 try {
                     if (useAlternateBuffer) {
                         VTHelpers.ClearScreen();
-                        VTHelpers.ReserveRow(Math.Max(1, pageHeight - 1));
                     }
                     else {
                         VTHelpers.ClearScreen();
@@ -482,8 +530,6 @@ public sealed class Pager : IDisposable {
             .Overflow(VerticalOverflow.Crop)
             .Cropping(VerticalOverflowCropping.Bottom)
             .Start(ctx => {
-                // Draw footer once before entering the interactive loop
-                DrawFooter(width, contentRows, initialViewport);
                 // Enter interactive loop using the live display context
                 Navigate(ctx, useAlternateBuffer);
             });

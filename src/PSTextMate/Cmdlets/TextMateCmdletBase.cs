@@ -17,7 +17,7 @@ public abstract class TextMateCmdletBase : PSCmdlet {
         Position = 0
     )]
     [AllowEmptyString]
-    [AllowNull]
+    [System.Management.Automation.AllowNull]
     [Alias("FullName", "Path")]
     public PSObject? InputObject { get; set; }
 

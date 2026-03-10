@@ -35,11 +35,9 @@ public static class TextMateHelper {
         }
     }
     internal static string[] SplitToLines(string input) {
-        if (input.Length == 0) {
-            return [string.Empty];
-        }
-
-        return input.Contains('\n') || input.Contains('\r') ? input.Split(["\r\n", "\n", "\r"], StringSplitOptions.None) : [input];
+        return input.Length == 0
+            ? [string.Empty]
+            : input.Contains('\n') || input.Contains('\r') ? input.Split(["\r\n", "\n", "\r"], StringSplitOptions.None) : [input];
     }
 
     internal static string[] NormalizeToLines(List<string> buffer) {
