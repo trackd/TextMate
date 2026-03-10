@@ -381,7 +381,7 @@ public sealed class HighlightedText : Renderable {
     public void ShowPager() {
         if (LineCount <= 0) return;
 
-        using var pager = new Pager(this);
+        var pager = new Pager(this);
         pager.Show();
     }
     public IRenderable? AutoPage() {

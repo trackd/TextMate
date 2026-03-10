@@ -23,7 +23,7 @@ public static class SpectreRenderBridge {
             : RenderForeign(renderableObject, width);
 
         return rendered.Length != 0
-            ? escapeAnsi ? PSHostUserInterface.GetOutputString(rendered, false) : rendered
+            ? escapeAnsi ? VTHelpers.StripAnsi(rendered) : rendered
             : throw new ArgumentException(
                 $"Object of type '{renderableObject.GetType().FullName}' does not implement a supported Spectre IRenderable shape.",
                 nameof(renderableObject)
@@ -100,8 +100,7 @@ public static class SpectreRenderBridge {
         if (ansiConsoleType is null
             || ansiConsoleSettingsType is null
             || ansiConsoleOutputType is null
-            || foreignRenderableType is null
-            || !foreignRenderableType.IsInstanceOfType(renderableObject)) {
+            || foreignRenderableType?.IsInstanceOfType(renderableObject) != true) {
             return string.Empty;
         }
 
@@ -129,7 +128,7 @@ public static class SpectreRenderBridge {
             PropertyInfo? profileProperty = console.GetType().GetProperty("Profile");
             object? profile = profileProperty?.GetValue(console);
             PropertyInfo? widthProperty = profile?.GetType().GetProperty("Width");
-            if (widthProperty is not null && widthProperty.CanWrite) {
+            if (widthProperty?.CanWrite == true) {
                 widthProperty.SetValue(profile, targetWidth);
             }
         }
@@ -155,10 +154,6 @@ public static class SpectreRenderBridge {
     }
 
     private static CallSite<Func<CallSite, object, IRenderable>> CreateConvertToRenderableCallSite() {
-        // Dynamic conversion is only used at runtime for cross-ALC Spectre values.
-#pragma warning disable IL2026
-        // Call-site generation requires dynamic code in JIT scenarios.
-#pragma warning disable IL3050
         return CallSite<Func<CallSite, object, IRenderable>>.Create(
             Microsoft.CSharp.RuntimeBinder.Binder.Convert(
                 CSharpBinderFlags.ConvertExplicit,
@@ -166,8 +161,6 @@ public static class SpectreRenderBridge {
                 typeof(SpectreRenderBridge)
             )
         );
-#pragma warning restore IL3050
-#pragma warning restore IL2026
     }
 
     private static bool TryCreateForeignRenderableAdapter(
@@ -184,7 +177,7 @@ public static class SpectreRenderBridge {
 
         Type? foreignRenderableType = valueType.Assembly.GetType("Spectre.Console.Rendering.IRenderable")
             ?? valueType.Assembly.GetType("Spectre.Console.IRenderable");
-        if (foreignRenderableType is null || !foreignRenderableType.IsInstanceOfType(value)) {
+        if (foreignRenderableType?.IsInstanceOfType(value) != true) {
             renderable = null;
             return false;
         }

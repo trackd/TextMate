@@ -30,6 +30,7 @@ global using Microsoft.CSharp.RuntimeBinder;
 global using PSTextMate;
 global using PSTextMate.Core;
 global using PSTextMate.Sixel;
+global using PSTextMate.Terminal;
 global using PSTextMate.Utilities;
 global using SixLabors.ImageSharp.PixelFormats;
 global using SixLabors.ImageSharp.Processing;

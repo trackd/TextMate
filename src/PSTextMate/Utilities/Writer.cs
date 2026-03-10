@@ -36,7 +36,7 @@ public static class Writer {
         ArgumentNullException.ThrowIfNull(highlightedText);
 
         if (highlightedText.Page || (autoPage && ShouldPage(highlightedText))) {
-            using var pager = new Pager(highlightedText);
+            var pager = new Pager(highlightedText);
             pager.Show();
             return string.Empty;
         }
@@ -69,7 +69,7 @@ public static class Writer {
     /// Uses a stable in-memory rendering path so the output can be streamed
     /// as plain text, redirected, or post-processed by custom formatters.
     /// </summary>
-    public static string WriteToString(IRenderable renderable, int? width = null) {
+    internal static string WriteToString(IRenderable renderable, int? width = null) {
         ArgumentNullException.ThrowIfNull(renderable);
 
         RenderContext context = _threadContext ??= new RenderContext();
@@ -83,7 +83,7 @@ public static class Writer {
     /// Compatibility wrapper for previous API shape.
     /// No host-direct output is performed; this returns the rendered string only.
     /// </summary>
-    public static string WriteToStringWithHostFallback(IRenderable renderable, int? width = null)
+    internal static string WriteToStringWithHostFallback(IRenderable renderable, int? width = null)
         => WriteToString(renderable, width);
 
     private static string GetTrimmedOutputAndReset(StringBuilder buffer) {

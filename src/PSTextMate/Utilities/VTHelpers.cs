@@ -1,6 +1,6 @@
 namespace PSTextMate.Utilities;
 
-public static class VTHelpers {
+public static partial class VTHelpers {
     private static bool? _supportsAlternateBuffer;
     private static bool? _supportsSynchronizedOutput;
     private const string AlternateBufferModeQuery = "[?1049$p";
@@ -11,6 +11,8 @@ public static class VTHelpers {
     private const string SynchronizedOutputInactiveReply = "[?2026;2$y";
     private const string BeginSynchronizedOutputSequence = "\x1b[?2026h";
     private const string EndSynchronizedOutputSequence = "\x1b[?2026l";
+    private const string EnableAlternateScrollSequence = "\x1b[?1007h";
+    private const string DisableAlternateScrollSequence = "\x1b[?1007l";
     public static void HideCursor() => Console.Write("\x1b[?25l");
     public static void ShowCursor() => Console.Write("\x1b[?25h");
     public static void ClearScreen() => Console.Write("\x1b[2J\x1b[H");
@@ -22,6 +24,32 @@ public static class VTHelpers {
     public static void ReserveRow(int height) => Console.Write($"\x1b[1;{height}r");
     // Reset scroll region to full height (CSI r)
     public static void ResetScrollRegion() => Console.Write("\x1b[r");
+
+    /// <summary>
+    /// Enables xterm alternate-scroll mode (1007) so mouse wheel can map to
+    /// scroll/navigation in alternate screen based pager sessions.
+    /// Unsupported terminals ignore this sequence.
+    /// </summary>
+    public static void EnableAlternateScroll() {
+        if (Console.IsOutputRedirected) {
+            return;
+        }
+
+        Console.Write(EnableAlternateScrollSequence);
+        Console.Out.Flush();
+    }
+
+    /// <summary>
+    /// Disables xterm alternate-scroll mode (1007).
+    /// </summary>
+    public static void DisableAlternateScroll() {
+        if (Console.IsOutputRedirected) {
+            return;
+        }
+
+        Console.Write(DisableAlternateScrollSequence);
+        Console.Out.Flush();
+    }
 
     /// <summary>
     /// Begins synchronized output mode (DEC private mode 2026).
@@ -100,4 +128,13 @@ public static class VTHelpers {
         }
     }
 
+
+    [GeneratedRegex(@"(\x1b\[\d*(;\d+)*m)|(\x1b\[\?\d+[hl])|(\x1b\]8;;.*?\x1b\\)", RegexOptions.Compiled, 1000)]
+    private static partial Regex AnsiRegex();
+
+    public static string StripAnsi(string? value) {
+        return string.IsNullOrEmpty(value)
+            ? string.Empty
+            : AnsiRegex().Replace(value, string.Empty);
+    }
 }

@@ -45,7 +45,23 @@ task Build {
         $ridDest = Join-Path $folders.DestinationPath $rid
         $null = New-Item -Path $ridDest -ItemType Directory -Force
         $nativePath = Join-Path $folders.TempLib 'runtimes' $rid 'native'
-        Get-ChildItem -Path $nativePath -File | Move-Item -Destination $ridDest -Force
+        if (-not (Test-Path $nativePath -PathType Container)) {
+            continue
+        }
+
+        foreach ($nativeFile in Get-ChildItem -Path $nativePath -File) {
+            $destinationFile = Join-Path $ridDest $nativeFile.Name
+            try {
+                if (Test-Path $destinationFile -PathType Leaf) {
+                    Remove-Item -Path $destinationFile -Force
+                }
+
+                Move-Item -Path $nativeFile.FullName -Destination $ridDest -Force
+            }
+            catch {
+                Write-Warning "Skipping native file update for '$destinationFile': $($_.Exception.Message)"
+            }
+        }
     }
     Get-ChildItem -Path $folders.TempLib -File | Move-Item -Destination $folders.DestinationPath -Force
     if (Test-Path -Path $folders.TempLib -PathType Container) {
@@ -118,6 +134,12 @@ task Test -if (-not $SkipTests) {
     Invoke-Pester -Configuration $pesterConfig
 }
 
+task DotNetTest -if (-not $SkipTests) {
+    exec {
+        dotnet test (Join-Path $PSScriptRoot 'tests' 'PSTextMate.InteractiveTests' 'PSTextMate.InteractiveTests.csproj') --configuration $Configuration --nologo
+    }
+}
+
 task CleanAfter {
     if ($script:folders.DestinationPath -and (Test-Path $script:folders.DestinationPath)) {
         Get-ChildItem $script:folders.DestinationPath -File -Recurse | Where-Object { $_.Extension -in '.pdb', '.json' } | Remove-Item -Force -ErrorAction Ignore
@@ -125,5 +147,5 @@ task CleanAfter {
 }
 
 
-task All -Jobs Clean, Build, ModuleFiles, GenerateHelp, CleanAfter , Test
+task All -Jobs Clean, Build, ModuleFiles, GenerateHelp, CleanAfter, Test, DotNetTest
 task BuildAndTest -Jobs Clean, Build, ModuleFiles, CleanAfter #, Test

@@ -31,8 +31,7 @@
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
-    </ItemGroup>
-    <ItemGroup>
+        <InternalsVisibleTo Include="PSTextMate.InteractiveTests" />
         <!-- https://learn.microsoft.com/en-us/nuget/concepts/auditing-packages#excluding-advisories -->
         <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-447r-wph3-92pm" />
     </ItemGroup>
