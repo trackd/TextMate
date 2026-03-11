@@ -23,18 +23,18 @@ public sealed class OutPageCmdlet : PSCmdlet {
         }
 
         object value = InputObject.BaseObject;
-        // WriteVerbose($"ProcessRecord: received input type '{value.GetType().FullName}' BaseType: '{value.GetType().BaseType}'.");
+        WriteVerbose($"ProcessRecord: received input type '{value.GetType().FullName}' baseType '{value.GetType().BaseType}'.");
 
         if (value is HighlightedText highlightedText) {
             if (_singleHighlightedText is null && !_sawNonHighlightedInput && _renderables.Count == 0 && _outStringInputs.Count == 0) {
                 _singleHighlightedText = highlightedText;
-                // WriteVerbose("ProcessRecord: took HighlightedText fast path and deferred to highlighted pager.");
+                WriteVerbose($"ProcessRecord: HighlightedText fast path renderables={highlightedText.Renderables.Length} lineCount={highlightedText.LineCount}.");
                 return;
             }
 
             _sawNonHighlightedInput = true;
             _renderables.AddRange(highlightedText.Renderables);
-            // WriteVerbose("ProcessRecord: merged HighlightedText renderables into the main renderable list.");
+            WriteVerbose($"ProcessRecord: merged HighlightedText renderables count={highlightedText.Renderables.Length} totalRenderables={_renderables.Count}.");
             return;
         }
 
@@ -42,7 +42,7 @@ public sealed class OutPageCmdlet : PSCmdlet {
 
         if (value is IRenderable renderable) {
             _renderables.Add(renderable);
-            // WriteVerbose("ProcessRecord: input matched IRenderable and was added directly.");
+            WriteVerbose($"ProcessRecord: input matched IRenderable type='{renderable.GetType().FullName}' totalRenderables={_renderables.Count}.");
             return;
         }
 
@@ -53,7 +53,7 @@ public sealed class OutPageCmdlet : PSCmdlet {
 
         if (TryConvertForeignSpectreRenderable(value, out IRenderable? convertedRenderable)) {
             _renderables.Add(convertedRenderable);
-            // WriteVerbose("ProcessRecord: converted foreign Spectre renderable to local IRenderable.");
+            WriteVerbose($"ProcessRecord: converted foreign Spectre renderable to local type='{convertedRenderable.GetType().FullName}' totalRenderables={_renderables.Count}.");
             return;
         }
 
@@ -62,14 +62,14 @@ public sealed class OutPageCmdlet : PSCmdlet {
 
     protected override void EndProcessing() {
         if (_singleHighlightedText is not null && !_sawNonHighlightedInput && _renderables.Count == 0 && _outStringInputs.Count == 0) {
-            // WriteVerbose("EndProcessing: using single HighlightedText pager path.");
+            WriteVerbose("EndProcessing: using single HighlightedText pager path.");
             var highlightedPager = new Pager(_singleHighlightedText);
             highlightedPager.Show();
             return;
         }
 
         if (_outStringInputs.Count > 0) {
-            // WriteVerbose($"EndProcessing: converting {_outStringInputs.Count} queued value(s) through Out-String.");
+            WriteVerbose($"EndProcessing: converting {_outStringInputs.Count} queued value(s) through Out-String.");
             List<string> formattedLines = ConvertWithOutStringLines(_outStringInputs);
             if (formattedLines.Count > 0) {
                 foreach (string line in formattedLines) {
@@ -78,14 +78,14 @@ public sealed class OutPageCmdlet : PSCmdlet {
                         : Helpers.VTConversion.ToParagraph(line));
                 }
 
-                // WriteVerbose($"EndProcessing: Out-String produced {formattedLines.Count} line(s) for paging.");
+                WriteVerbose($"EndProcessing: Out-String produced {formattedLines.Count} line(s) for paging.");
             }
             else {
                 foreach (object value in _outStringInputs) {
                     _renderables.Add(new Text(LanguagePrimitives.ConvertTo<string>(value)));
                 }
 
-                // WriteVerbose("EndProcessing: Out-String returned no lines; used string conversion fallback.");
+                WriteVerbose("EndProcessing: Out-String returned no lines; used string conversion fallback.");
             }
         }
 
@@ -95,7 +95,7 @@ public sealed class OutPageCmdlet : PSCmdlet {
         }
 
         WriteVerbose($"EndProcessing: launching pager with {_renderables.Count} renderable(s).");
-        var pager = new Pager(_renderables);
+        var pager = new Pager(_renderables, AnsiConsole.Console, null, suppressTerminalControlSequences: false);
         pager.Show();
     }
 
@@ -181,11 +181,6 @@ public sealed class OutPageCmdlet : PSCmdlet {
         return IsSpectreObject(fullName)
             && value is not IRenderable
             && SpectreRenderBridge.TryConvertToLocalRenderable(value, out renderable);
-    }
-
-    private static bool IsSpectreObject(object value) {
-        string? fullName = value.GetType().FullName;
-        return IsSpectreObject(fullName);
     }
     private static bool IsSpectreObject(string? str) {
         return !string.IsNullOrWhiteSpace(str)

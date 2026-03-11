@@ -50,10 +50,13 @@ internal sealed class PagerDocument {
 
         try {
             string rendered = Writer.WriteToString(renderable, width: 200);
-            return Normalize(VTHelpers.StripAnsi(rendered));
+            string normalized = Normalize(VTHelpers.StripAnsi(rendered));
+            return !string.IsNullOrEmpty(normalized)
+                ? normalized
+                : Normalize(renderable.ToString());
         }
         catch {
-            return string.Empty;
+            return Normalize(renderable.ToString());
         }
     }
 

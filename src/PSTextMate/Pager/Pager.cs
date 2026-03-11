@@ -34,6 +34,8 @@ public sealed class Pager {
     private string _searchStatusText = string.Empty;
     private bool _isSearchInputActive;
     private readonly StringBuilder _searchInputBuffer = new(64);
+    private static readonly Style SearchRowTextStyle = new(Color.White, Color.Grey);
+    private static readonly Style SearchMatchTextStyle = new(Color.Black, Color.Orange1);
     private const string SearchRowStyle = "white on grey";
     private const string SearchMatchStyle = "black on orange1";
 
@@ -147,7 +149,7 @@ public sealed class Pager {
     internal Pager(
         IEnumerable<IRenderable> renderables,
         IAnsiConsole console,
-        Func<ConsoleKeyInfo?>? tryReadKeyOverride,
+        Func<ConsoleKeyInfo?>? tryReadKeyOverride = null,
         bool suppressTerminalControlSequences = false
     ) {
         _console = console ?? throw new ArgumentNullException(nameof(console));
@@ -461,7 +463,8 @@ public sealed class Pager {
         var items = new List<IRenderable>(viewport.Count);
         for (int i = 0; i < viewport.Count; i++) {
             int renderableIndex = viewport.Top + i;
-            items.Add(ApplySearchHighlight(renderableIndex, _renderables[renderableIndex]));
+            IRenderable highlighted = ApplySearchHighlight(renderableIndex, _renderables[renderableIndex]);
+            items.Add(highlighted);
         }
 
         return new Rows(items);
@@ -469,21 +472,61 @@ public sealed class Pager {
 
     private IRenderable ApplySearchHighlight(int renderableIndex, IRenderable renderable) {
         IReadOnlyList<PagerSearchHit> hits = _search.GetHitsForRenderable(renderableIndex);
-        if (hits.Count == 0) {
-            return renderable;
-        }
 
-        if (PagerHighlighting.TryBuildStructuredHighlightRenderable(renderable, _search.Query, SearchRowStyle, SearchMatchStyle, out IRenderable structuredHighlight)) {
+        bool isStructuredRenderable = PagerHighlighting.IsStructuredRowHighlightCandidate(renderable);
+
+        // Keep table-specific highlighting in the structured path so row styling
+        // is scoped to matching rows rather than the whole rendered table block.
+        if ((isStructuredRenderable || hits.Count == 0)
+            && PagerHighlighting.TryBuildStructuredHighlightRenderable(
+                renderable,
+                _search.Query,
+                SearchRowStyle,
+                SearchMatchStyle,
+                hits,
+                out IRenderable structuredHighlight
+            )) {
             return structuredHighlight;
         }
 
         string plainText = GetSearchTextForHighlight(renderableIndex, renderable);
-        if (plainText.Length == 0) {
+        if (plainText.Length == 0 || !_search.HasQuery) {
             return renderable;
         }
 
-        string highlighted = PagerHighlighting.BuildHighlightedMarkup(plainText, hits, SearchMatchStyle);
-        return new Markup($"[{SearchRowStyle}]{highlighted}[/]");
+        if (hits.Count == 0) {
+            hits = BuildQueryHits(plainText, _search.Query, renderableIndex);
+            if (hits.Count == 0) {
+                return renderable;
+            }
+        }
+
+        return PagerHighlighting.BuildSegmentHighlightRenderable(renderable, _search.Query, SearchRowTextStyle, SearchMatchTextStyle);
+    }
+
+    private static List<PagerSearchHit> BuildQueryHits(string plainText, string query, int renderableIndex) {
+        if (string.IsNullOrEmpty(plainText) || string.IsNullOrWhiteSpace(query)) {
+            return [];
+        }
+
+        string normalizedQuery = query.Trim();
+        if (normalizedQuery.Length == 0) {
+            return [];
+        }
+
+        var hits = new List<PagerSearchHit>();
+        int searchStart = 0;
+        while (searchStart <= plainText.Length - normalizedQuery.Length) {
+            int hitOffset = plainText.IndexOf(normalizedQuery, searchStart, StringComparison.OrdinalIgnoreCase);
+            if (hitOffset < 0) {
+                break;
+            }
+
+            hits.Add(new PagerSearchHit(renderableIndex, hitOffset, normalizedQuery.Length, 0, hitOffset));
+            searchStart = hitOffset + Math.Max(1, normalizedQuery.Length);
+        }
+
+        return hits;
     }
 
     private string GetSearchTextForHighlight(int renderableIndex, IRenderable renderable) {
@@ -501,10 +544,13 @@ public sealed class Pager {
         try {
             int width = Math.Max(20, WindowWidth - 2);
             string rendered = Writer.WriteToString(renderable, width);
-            return PagerHighlighting.NormalizeText(VTHelpers.StripAnsi(rendered));
+            string normalized = PagerHighlighting.NormalizeText(VTHelpers.StripAnsi(rendered));
+            return normalized.Length > 0
+                ? normalized
+                : PagerHighlighting.NormalizeText(renderable.ToString());
         }
         catch {
-            return string.Empty;
+            return PagerHighlighting.NormalizeText(renderable.ToString());
         }
     }
 
@@ -541,7 +587,7 @@ public sealed class Pager {
             keyText = $"{keyText}  {_searchStatusText}";
         }
 
-        int chartWidth = Math.Clamp(width / 5, 12, 28);
+        int chartWidth = Math.Clamp(width / 4, 14, 40);
         double progressUnits = total == 0 ? 0d : (double)end / safeTotal * chartWidth;
         double chartValue = end <= 0 ? 0d : Math.Clamp(Math.Ceiling(progressUnits), Math.Min(4d, chartWidth), chartWidth);
         BarChart chart = new BarChart()
@@ -550,16 +596,14 @@ public sealed class Pager {
             .HideValues()
             .AddItem(" ", chartValue, Color.Lime);
 
-        Columns columns = new([
-            new Text(keyText, new Style(Color.Grey)),
-            new Markup($"[bold]{statusText}[/]"),
-            chart
-        ]) {
-            Expand = true,
-            Padding = new Padding(0, 0, 0, 0)
-        };
+        var footerBody = new Layout("footer-body");
+        footerBody.SplitColumns(
+            new Layout("keys").Ratio(1).Update(new Text(keyText, new Style(Color.Grey))),
+            new Layout("status").Size(_statusColumnWidth).Update(new Align(new Markup($"[bold]{statusText}[/]"), HorizontalAlignment.Right)),
+            new Layout("chart").Size(chartWidth).Update(chart)
+        );
 
-        return new Panel(columns) {
+        return new Panel(footerBody) {
             Border = BoxBorder.Rounded,
             Padding = new Padding(0, 0, 0, 0),
             Expand = true
