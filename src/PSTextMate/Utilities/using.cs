@@ -42,7 +42,6 @@ global using TextMateSharp.Grammars;
 global using TextMateSharp.Registry;
 global using TextMateSharp.Themes;
 global using Color = Spectre.Console.Color;
-global using PSHostUserInterface = System.Management.Automation.Host.PSHostUserInterface;
 global using SixColor = SixLabors.ImageSharp.Color;
 global using SixImage = SixLabors.ImageSharp.Image;
 global using TableColumnAlign = Markdig.Extensions.Tables.TableColumnAlign;

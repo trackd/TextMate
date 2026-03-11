@@ -19,6 +19,14 @@ Search queries to try: `Out-Page`, `Format-Markdown`, `Panel`, `Sixel`.
 2. Press `n` repeatedly.
 3. Confirm highlight stays on the expected row.
 
+## Nested Lists with Tasks
+
+1. First item
+   - [x] Nested completed task
+   - [ ] Nested incomplete task
+2. Second item
+   - [ ] Another nested task
+
 ## Block Quote
 
 > The pager should highlight matches in quoted text.
@@ -35,9 +43,19 @@ Search queries to try: `Out-Page`, `Format-Markdown`, `Panel`, `Sixel`.
 ## Fenced Code
 
 ```powershell
-Get-Content README.md -Raw |
-    Format-Markdown -Theme SolarizedLight |
+Get-Content -Path '.\README.md' -Raw |
+    Format-Markdown -Theme 'SolarizedLight' |
     Out-Page
+```
+
+```csharp
+public class TestClass {
+    public string Name { get; set; } = "Test";
+    
+    public void DoSomething() {
+        Console.WriteLine($"Hello {Name}!");
+    }
+}
 ```
 
 ## Inline HTML Block
@@ -46,6 +64,10 @@ Get-Content README.md -Raw |
 <p>Panel-like renderers should not tint everything when only one line matches.</p>
 <p>Query target: Out-Page</p>
 </div>
+
+### Inline Sixel HTML
+
+<img src="./../assets/demo.png" alt="Demo" width="40" />
 
 ## Mixed Emphasis
 

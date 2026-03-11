@@ -110,7 +110,7 @@ internal sealed class PagerViewportEngine {
         return top;
     }
 
-    public int ScrollTop(int currentTop, int delta, int windowHeight) {
+    public int ScrollTop(int currentTop, int delta, int contentRows) {
         if (_renderables.Count == 0) {
             return currentTop;
         }
@@ -120,7 +120,7 @@ internal sealed class PagerViewportEngine {
             return currentTop;
         }
 
-        int maxTop = GetMaxTop(Math.Max(1, windowHeight - 1));
+        int maxTop = GetMaxTop(Math.Max(1, contentRows));
         return Math.Clamp(currentTop + direction, 0, maxTop);
     }
 

@@ -95,7 +95,7 @@ public abstract class TextMateCmdletBase : PSCmdlet {
             if (InputObject?.BaseObject is FileInfo file) {
                 try {
                     foreach (HighlightedText result in ProcessPathInput(file)) {
-                        WriteObject(result);
+                        EmitHighlightedResult(result);
                     }
                 }
                 catch (Exception ex) {
@@ -118,7 +118,7 @@ public abstract class TextMateCmdletBase : PSCmdlet {
 
             try {
                 foreach (HighlightedText result in ProcessPathInput(file)) {
-                    WriteObject(result);
+                    EmitHighlightedResult(result);
                 }
             }
             catch (Exception ex) {
@@ -139,7 +139,7 @@ public abstract class TextMateCmdletBase : PSCmdlet {
 
             HighlightedText? result = ProcessStringInput();
             if (result is not null) {
-                WriteObject(result);
+                EmitHighlightedResult(result);
             }
         }
         catch (Exception ex) {
@@ -167,6 +167,15 @@ public abstract class TextMateCmdletBase : PSCmdlet {
                 WrapInPanel = Panel.IsPresent,
                 Page = Page.IsPresent
             };
+    }
+
+    private void EmitHighlightedResult(HighlightedText result) {
+        if (Page.IsPresent) {
+            result.ShowPager();
+            return;
+        }
+
+        WriteObject(result);
     }
 
     private IEnumerable<HighlightedText> ProcessPathInput(FileInfo filePath) {

@@ -6,7 +6,6 @@ namespace PSTextMate.Commands;
 [Cmdlet(VerbsData.Out, "Page")]
 [OutputType(typeof(void))]
 public sealed class OutPageCmdlet : PSCmdlet {
-    private const char Escape = '\x1B';
     private readonly List<IRenderable> _renderables = [];
     private readonly List<object> _outStringInputs = [];
     private HighlightedText? _singleHighlightedText;
@@ -18,23 +17,19 @@ public sealed class OutPageCmdlet : PSCmdlet {
 
     protected override void ProcessRecord() {
         if (InputObject?.BaseObject is null) {
-            // WriteVerbose("ProcessRecord: InputObject is null; skipping item.");
             return;
         }
 
         object value = InputObject.BaseObject;
-        // WriteVerbose($"ProcessRecord: received input type '{value.GetType().FullName}' baseType '{value.GetType().BaseType}'.");
 
         if (value is HighlightedText highlightedText) {
             if (_singleHighlightedText is null && !_sawNonHighlightedInput && _renderables.Count == 0 && _outStringInputs.Count == 0) {
                 _singleHighlightedText = highlightedText;
-                // WriteVerbose($"ProcessRecord: HighlightedText fast path renderables={highlightedText.Renderables.Length} lineCount={highlightedText.LineCount}.");
                 return;
             }
 
             _sawNonHighlightedInput = true;
             _renderables.AddRange(highlightedText.Renderables);
-            // WriteVerbose($"ProcessRecord: merged HighlightedText renderables count={highlightedText.Renderables.Length} totalRenderables={_renderables.Count}.");
             return;
         }
 
@@ -42,7 +37,6 @@ public sealed class OutPageCmdlet : PSCmdlet {
 
         if (value is IRenderable renderable) {
             _renderables.Add(renderable);
-            // WriteVerbose($"ProcessRecord: input matched IRenderable type='{renderable.GetType().FullName}' totalRenderables={_renderables.Count}.");
             return;
         }
 
@@ -53,48 +47,39 @@ public sealed class OutPageCmdlet : PSCmdlet {
 
         if (TryConvertForeignSpectreRenderable(value, out IRenderable? convertedRenderable)) {
             _renderables.Add(convertedRenderable);
-            WriteVerbose($"ProcessRecord: converted foreign Spectre renderable to local type='{convertedRenderable.GetType().FullName}' totalRenderables={_renderables.Count}.");
             return;
         }
 
-        _outStringInputs.Add(value);
+        _outStringInputs.Add(InputObject);
     }
 
     protected override void EndProcessing() {
         if (_singleHighlightedText is not null && !_sawNonHighlightedInput && _renderables.Count == 0 && _outStringInputs.Count == 0) {
-            // WriteVerbose("EndProcessing: using single HighlightedText pager path.");
             var highlightedPager = new Pager(_singleHighlightedText);
             highlightedPager.Show();
             return;
         }
 
         if (_outStringInputs.Count > 0) {
-            // WriteVerbose($"EndProcessing: converting {_outStringInputs.Count} queued value(s) through Out-String.");
             List<string> formattedLines = ConvertWithOutStringLines(_outStringInputs);
             if (formattedLines.Count > 0) {
                 foreach (string line in formattedLines) {
-                    _renderables.Add(line.Length == 0
-                        ? new Text(string.Empty)
-                        : Helpers.VTConversion.ToParagraph(line));
+                    _renderables.Add(line.Length == 0 ? Text.Empty : VTConversion.ToParagraph(line));
                 }
 
-                // WriteVerbose($"EndProcessing: Out-String produced {formattedLines.Count} line(s) for paging.");
             }
             else {
                 foreach (object value in _outStringInputs) {
                     _renderables.Add(new Text(LanguagePrimitives.ConvertTo<string>(value)));
                 }
 
-                // WriteVerbose("EndProcessing: Out-String returned no lines; used string conversion fallback.");
             }
         }
 
         if (_renderables.Count == 0) {
-            // WriteVerbose("EndProcessing: no renderables collected; nothing to page.");
             return;
         }
 
-        WriteVerbose($"EndProcessing: launching pager with {_renderables.Count} renderable(s).");
         var pager = new Pager(_renderables, AnsiConsole.Console, null, suppressTerminalControlSequences: false);
         pager.Show();
     }

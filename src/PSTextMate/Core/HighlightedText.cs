@@ -395,7 +395,7 @@ public sealed class HighlightedText : Renderable {
     /// <summary>
     /// Renders this highlighted text to a string.
     /// </summary>
-    public string Write()
+    public string? Write()
         => Writer.Write(this, Page);
 
     public override string ToString()

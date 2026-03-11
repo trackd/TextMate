@@ -8,6 +8,8 @@ namespace PSTextMate.Terminal;
 /// - Home/End: go to start/end
 /// - / or Ctrl+F: prompt for search query
 /// - n / N: next / previous match
+/// - c: clear active search
+/// - ?: show/hide keybindings
 /// - q or Escape: quit
 /// </summary>
 public sealed class Pager {
@@ -33,6 +35,7 @@ public sealed class Pager {
     private bool _lastPageHadImages;
     private string _searchStatusText = string.Empty;
     private bool _isSearchInputActive;
+    private bool _isHelpOverlayActive;
     private readonly StringBuilder _searchInputBuffer = new(64);
     private static readonly Style SearchRowTextStyle = new(Color.White, Color.Grey);
     private static readonly Style SearchMatchTextStyle = new(Color.Black, Color.Orange1);
@@ -238,6 +241,22 @@ public sealed class Pager {
                     continue;
                 }
 
+                if (_isHelpOverlayActive) {
+                    if (key.Key == ConsoleKey.Q) {
+                        running = false;
+                        continue;
+                    }
+
+                    _isHelpOverlayActive = false;
+                    forceRedraw = true;
+
+                    if (key.Key == ConsoleKey.Escape || key.KeyChar == '?') {
+                        continue;
+                    }
+
+                    continue;
+                }
+
                 bool isCtrlF = key.Key == ConsoleKey.F && (key.Modifiers & ConsoleModifiers.Control) != 0;
                 if (key.KeyChar == '/' || isCtrlF) {
                     BeginSearchInput();
@@ -245,13 +264,19 @@ public sealed class Pager {
                     continue;
                 }
 
+                if (key.KeyChar == '?') {
+                    _isHelpOverlayActive = true;
+                    forceRedraw = true;
+                    continue;
+                }
+
                 switch (key.Key) {
                     case ConsoleKey.DownArrow:
-                        ScrollRenderable(1);
+                        ScrollRenderable(1, contentRows);
                         forceRedraw = true;
                         break;
                     case ConsoleKey.UpArrow:
-                        ScrollRenderable(-1);
+                        ScrollRenderable(-1, contentRows);
                         forceRedraw = true;
                         break;
                     case ConsoleKey.Spacebar:
@@ -281,6 +306,13 @@ public sealed class Pager {
 
                         forceRedraw = true;
                         break;
+                    case ConsoleKey.C:
+                        if (_search.HasQuery) {
+                            ClearSearch();
+                            forceRedraw = true;
+                        }
+
+                        break;
                     case ConsoleKey.Q:
                     case ConsoleKey.Escape:
                         running = false;
@@ -304,7 +336,7 @@ public sealed class Pager {
         }
     }
 
-    private void ScrollRenderable(int delta) => _top = _viewportEngine.ScrollTop(_top, delta, WindowHeight);
+    private void ScrollRenderable(int delta, int contentRows) => _top = _viewportEngine.ScrollTop(_top, delta, contentRows);
 
     private void PageDown(int contentRows) => _top = _viewportEngine.PageDownTop(_top, contentRows);
 
@@ -363,6 +395,12 @@ public sealed class Pager {
         _searchStatusText = BuildSearchStatus();
     }
 
+    private void ClearSearch() {
+        _search.SetQuery(string.Empty);
+        _searchInputBuffer.Clear();
+        _searchStatusText = string.Empty;
+    }
+
     private void JumpToNextMatch() {
         if (!_search.HasQuery) {
             _searchStatusText = "No active search. Press / to search.";
@@ -412,9 +450,11 @@ public sealed class Pager {
     private Layout BuildRenderable(PagerViewportWindow viewport, int width) {
         int footerHeight = GetFooterHeight(width);
         int searchInputHeight = GetSearchInputHeight();
-        IRenderable content = viewport.Count <= 0
-            ? Text.Empty
-            : BuildContentRenderable(viewport);
+        IRenderable content = _isHelpOverlayActive
+            ? BuildHelpOverlayPanel()
+            : viewport.Count <= 0
+                ? Text.Empty
+                : BuildContentRenderable(viewport);
 
         IRenderable footer = BuildFooter(width, viewport);
         var root = new Layout("root");
@@ -448,9 +488,40 @@ public sealed class Pager {
         };
     }
 
+    private static Panel BuildHelpOverlayPanel() {
+        var helpRows = new Rows(
+            new Text("Keybindings", new Style(Color.White, decoration: Decoration.Bold)),
+            Text.Empty,
+            new Text("  Up/Down       Move one item", new Style(Color.Grey)),
+            new Text("  PgUp/PgDn     Page navigation", new Style(Color.Grey)),
+            new Text("  Home/End      Jump to start/end", new Style(Color.Grey)),
+            new Text("  / or Ctrl+F   Search", new Style(Color.Grey)),
+            new Text("  n / N         Next / previous match", new Style(Color.Grey)),
+            new Text("  c             Clear active search", new Style(Color.Grey)),
+            new Text("  ?             Toggle this help", new Style(Color.Grey)),
+            new Text("  q or Esc      Quit pager", new Style(Color.Grey)),
+            Text.Empty,
+            new Text("Press ? or Esc to close help.", new Style(Color.Yellow))
+        );
+
+        return new Panel(new Align(helpRows, HorizontalAlignment.Left, VerticalAlignment.Middle)) {
+            Header = new PanelHeader("Pager Help", Justify.Left),
+            Border = BoxBorder.Double,
+            Padding = new Padding(2, 1, 2, 1),
+            Expand = true
+        };
+    }
+
     private IRenderable BuildContentRenderable(PagerViewportWindow viewport) {
-        if (_sourceHighlightedText is not null && !_search.HasQuery) {
-            _sourceHighlightedText.SetView(_renderables, viewport.Top, viewport.Count);
+        if (_sourceHighlightedText is not null) {
+            if (_search.HasQuery) {
+                List<IRenderable> highlightedItems = BuildSearchAwareItems(viewport);
+                _sourceHighlightedText.SetView(highlightedItems, 0, highlightedItems.Count);
+            }
+            else {
+                _sourceHighlightedText.SetView(_renderables, viewport.Top, viewport.Count);
+            }
+
             _sourceHighlightedText.LineNumberStart = (_originalLineNumberStart ?? 1) + viewport.Top;
             _sourceHighlightedText.LineNumberWidth = _stableLineNumberWidth;
             return _sourceHighlightedText;
@@ -459,7 +530,7 @@ public sealed class Pager {
         return _search.HasQuery ? BuildSearchAwareContent(viewport) : new Rows(_renderables.Skip(viewport.Top).Take(viewport.Count));
     }
 
-    private Rows BuildSearchAwareContent(PagerViewportWindow viewport) {
+    private List<IRenderable> BuildSearchAwareItems(PagerViewportWindow viewport) {
         var items = new List<IRenderable>(viewport.Count);
         for (int i = 0; i < viewport.Count; i++) {
             int renderableIndex = viewport.Top + i;
@@ -467,8 +538,11 @@ public sealed class Pager {
             items.Add(highlighted);
         }
 
-        return new Rows(items);
+        return items;
     }
+
+    private Rows BuildSearchAwareContent(PagerViewportWindow viewport)
+        => new(BuildSearchAwareItems(viewport));
 
     private IRenderable ApplySearchHighlight(int renderableIndex, IRenderable renderable) {
         IReadOnlyList<PagerSearchHit> hits = _search.GetHitsForRenderable(renderableIndex);
@@ -563,10 +637,13 @@ public sealed class Pager {
         int total = _renderables.Count;
         int start = total == 0 ? 0 : viewport.Top + 1;
         int end = viewport.EndExclusive;
-        string baseText = $"↑↓ Scroll  PgUp/PgDn Page  Home/End Jump  / or Ctrl+F Search  n/N Match  q/Esc Quit    {start}-{end}/{total}";
-        string inputHelp = _isSearchInputActive ? "   Enter Apply  Esc Cancel" : string.Empty;
+        string baseText = $"{start}-{end}/{total}";
+        string defaultHelp = !_isSearchInputActive && string.IsNullOrEmpty(_searchStatusText)
+            ? "   Press ? for help"
+            : string.Empty;
+        string inputHelp = _isSearchInputActive ? "   Search: Enter Apply  Esc Cancel" : string.Empty;
         return string.IsNullOrEmpty(_searchStatusText)
-            ? new Text(baseText + inputHelp, new Style(Color.Grey))
+            ? new Text(baseText + defaultHelp + inputHelp, new Style(Color.Grey))
             : new Text($"{baseText}{inputHelp}   {_searchStatusText}", new Style(Color.Grey));
     }
 
@@ -577,14 +654,16 @@ public sealed class Pager {
         int safeTotal = Math.Max(1, total);
         int digits = Math.Max(1, safeTotal.ToString(CultureInfo.InvariantCulture).Length);
 
-        string keyText = "↑↓ Scroll  PgUp/PgDn Page  Home/End Jump  / or Ctrl+F Search  n/N Match  q/Esc Quit";
+        string keyText = "Press ? for help";
         string statusText = $"{start.ToString(CultureInfo.InvariantCulture).PadLeft(digits)}-{end.ToString(CultureInfo.InvariantCulture).PadLeft(digits)}/{total.ToString(CultureInfo.InvariantCulture).PadLeft(digits)}".PadLeft(_statusColumnWidth);
         if (_isSearchInputActive) {
-            keyText = $"{keyText}  Enter Apply  Esc Cancel";
+            keyText = "Search: Enter Apply  Esc Cancel";
         }
 
         if (!string.IsNullOrEmpty(_searchStatusText)) {
-            keyText = $"{keyText}  {_searchStatusText}";
+            keyText = string.IsNullOrEmpty(keyText)
+                ? _searchStatusText
+                : $"{keyText}  {_searchStatusText}";
         }
 
         int chartWidth = Math.Clamp(width / 4, 14, 40);

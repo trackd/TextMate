@@ -1,4 +1,4 @@
-namespace PSTextMate.Helpers;
+namespace PSTextMate.Utilities;
 
 /// <summary>
 /// Efficient parser for VT (Virtual Terminal) escape sequences that converts them to Spectre.Console objects.

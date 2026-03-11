@@ -24,6 +24,9 @@ public static partial class VTHelpers {
     public static void ReserveRow(int height) => Console.Write($"\x1b[1;{height}r");
     // Reset scroll region to full height (CSI r)
     public static void ResetScrollRegion() => Console.Write("\x1b[r");
+    public static void MoveCursorRowUp(int rows) => Console.Write($"\x1b[{rows}A");
+    public static void MoveCursorRowDown(int rows) => Console.Write($"\x1b[{rows}B");
+
 
     /// <summary>
     /// Enables xterm alternate-scroll mode (1007) so mouse wheel can map to

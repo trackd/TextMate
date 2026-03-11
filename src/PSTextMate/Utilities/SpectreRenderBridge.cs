@@ -191,12 +191,12 @@ public static class SpectreRenderBridge {
             .Replace('\r', '\n')
             .Split('\n');
         if (lines.Length <= 1) {
-            return Helpers.VTConversion.ToParagraph(lines[0]);
+            return VTConversion.ToParagraph(lines[0]);
         }
 
         var renderables = new IRenderable[lines.Length];
         for (int i = 0; i < lines.Length; i++) {
-            renderables[i] = Helpers.VTConversion.ToParagraph(lines[i]);
+            renderables[i] = VTConversion.ToParagraph(lines[i]);
         }
 
         return new Rows(renderables);

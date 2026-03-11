@@ -32,20 +32,22 @@ public static class Writer {
     /// Renders highlighted text to string.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static string Write(HighlightedText highlightedText, bool autoPage = false) {
+    public static string? Write(HighlightedText highlightedText, bool autoPage = false, bool FromFormat = false) {
         ArgumentNullException.ThrowIfNull(highlightedText);
 
         if (highlightedText.Page || (autoPage && ShouldPage(highlightedText))) {
             var pager = new Pager(highlightedText);
             pager.Show();
-            return string.Empty;
+            if (FromFormat) VTHelpers.MoveCursorRowUp(2);
+            return null;
         }
 
         // Sixel payload must be written as raw control sequences. Converting to a string
         // and flowing through host formatting can strip DCS wrappers and print payload text.
         if (ContainsImageRenderables(highlightedText.Renderables)) {
             AnsiConsole.Write(highlightedText);
-            return string.Empty;
+            if (FromFormat) VTHelpers.MoveCursorRowUp(2);
+            return null;
         }
 
         return WriteToString(highlightedText);

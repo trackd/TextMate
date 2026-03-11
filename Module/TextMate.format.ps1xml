@@ -52,7 +52,7 @@
             <CustomItem>
               <ExpressionBinding>
                 <ScriptBlock>
-                  [PSTextMate.Utilities.Writer]::Write($_)
+                  [PSTextMate.Utilities.Writer]::Write($_, $false, $true)
                 </ScriptBlock>
               </ExpressionBinding>
             </CustomItem>
