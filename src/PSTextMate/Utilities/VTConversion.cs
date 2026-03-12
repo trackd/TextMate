@@ -9,11 +9,6 @@ public static class VTConversion {
     private const char CSI_START = '[';
     private const char OSC_START = ']';
     private const char SGR_END = 'm';
-    private enum ForeignImageType {
-        Sixel,
-        IIP,
-        Kitty
-    }
 
     /// <summary>
     /// Parses a string containing VT escape sequences and returns a Paragraph object.
@@ -515,68 +510,5 @@ public static class VTConversion {
         public readonly Style ToSpectreStyle()
             => SpectreStyleCompat.CreateWithLink(Foreground, Background, Decoration, Link);
 
-        public readonly string ToMarkup() {
-            // Use StringBuilder to avoid List<string> allocation
-            // Typical markup is <64 chars, so inline capacity avoids resizing
-            var sb = new StringBuilder(64);
-
-            if (Foreground.HasValue) {
-                sb.Append(Foreground.Value.ToMarkup());
-            }
-            else {
-                sb.Append("Default ");
-            }
-
-            if (Background.HasValue) {
-                if (sb.Length > 0) sb.Append(' ');
-                sb.Append("on ").Append(Background.Value.ToMarkup());
-            }
-
-            if (Decoration != Decoration.None) {
-                if ((Decoration & Decoration.Bold) != 0) {
-                    if (sb.Length > 0) sb.Append(' ');
-                    sb.Append("bold");
-                }
-                if ((Decoration & Decoration.Dim) != 0) {
-                    if (sb.Length > 0) sb.Append(' ');
-                    sb.Append("dim");
-                }
-                if ((Decoration & Decoration.Italic) != 0) {
-                    if (sb.Length > 0) sb.Append(' ');
-                    sb.Append("italic");
-                }
-                if ((Decoration & Decoration.Underline) != 0) {
-                    if (sb.Length > 0) sb.Append(' ');
-                    sb.Append("underline");
-                }
-                if ((Decoration & Decoration.Strikethrough) != 0) {
-                    if (sb.Length > 0) sb.Append(' ');
-                    sb.Append("strikethrough");
-                }
-                if ((Decoration & Decoration.SlowBlink) != 0) {
-                    if (sb.Length > 0) sb.Append(' ');
-                    sb.Append("slowblink");
-                }
-                if ((Decoration & Decoration.RapidBlink) != 0) {
-                    if (sb.Length > 0) sb.Append(' ');
-                    sb.Append("rapidblink");
-                }
-                if ((Decoration & Decoration.Invert) != 0) {
-                    if (sb.Length > 0) sb.Append(' ');
-                    sb.Append("invert");
-                }
-                if ((Decoration & Decoration.Conceal) != 0) {
-                    if (sb.Length > 0) sb.Append(' ');
-                    sb.Append("conceal");
-                }
-            }
-
-            if (!string.IsNullOrEmpty(Link)) {
-                if (sb.Length > 0) sb.Append(' ');
-                sb.Append("link=").Append(Link);
-            }
-
-            return sb.ToString();
-        }
     }
 }

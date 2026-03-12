@@ -4,6 +4,7 @@ namespace PSTextMate.Commands;
 /// Sends renderables or VT-formatted strings to the interactive pager.
 /// </summary>
 [Cmdlet(VerbsData.Out, "Page")]
+[Alias("page")]
 [OutputType(typeof(void))]
 public sealed class OutPageCmdlet : PSCmdlet {
     private readonly List<IRenderable> _renderables = [];

@@ -33,11 +33,6 @@ public abstract class TextMateCmdletBase : PSCmdlet {
     [Parameter]
     public SwitchParameter LineNumbers { get; set; }
 
-    /// <summary>
-    /// When present, wrap output in a Spectre Panel.
-    /// </summary>
-    [Parameter]
-    public SwitchParameter Panel { get; set; }
 
     /// <summary>
     /// When present, always render through the interactive pager.
@@ -164,7 +159,7 @@ public abstract class TextMateCmdletBase : PSCmdlet {
                 Renderables = renderables,
                 ShowLineNumbers = LineNumbers.IsPresent,
                 Language = token,
-                WrapInPanel = Panel.IsPresent,
+                // WrapInPanel = Panel.IsPresent,
                 Page = Page.IsPresent
             };
     }
@@ -200,7 +195,7 @@ public abstract class TextMateCmdletBase : PSCmdlet {
                 Renderables = renderables,
                 ShowLineNumbers = LineNumbers.IsPresent,
                 Language = token,
-                WrapInPanel = Panel.IsPresent,
+                // WrapInPanel = Panel.IsPresent,
                 Page = Page.IsPresent
             };
         }

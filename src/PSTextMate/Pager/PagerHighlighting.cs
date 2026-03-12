@@ -99,9 +99,11 @@ internal static class PagerHighlighting {
         string matchStyle,
         IReadOnlyList<PagerSearchHit> indexedHits
     ) {
-        HashSet<int> matchedRowsFromHits = ResolveTableRowsFromHitLines(source, indexedHits);
         bool[] rowCellMatches = [.. source.Rows.Select(row => row.Any(cell => RenderableContainsQuery(cell, query)))];
         bool hasAnyRowCellMatch = rowCellMatches.Any(static match => match);
+        HashSet<int> matchedRowsFromHits = hasAnyRowCellMatch
+            ? []
+            : ResolveTableRowsFromHitLines(source, indexedHits);
 
         var clone = new Table {
             Border = source.Border,
@@ -134,7 +136,6 @@ internal static class PagerHighlighting {
 
         int rowIndex = 0;
         foreach (TableRow sourceRow in source.Rows) {
-            string[] cellTexts = [.. sourceRow.Select(ExtractRenderableText).Select(NormalizeText)];
             bool rowHasCellMatch = rowCellMatches[rowIndex];
             bool rowHasIndexedContextMatch = !hasAnyRowCellMatch && matchedRowsFromHits.Contains(rowIndex);
             bool rowHasMatch = rowHasCellMatch || rowHasIndexedContextMatch;
@@ -167,9 +168,11 @@ internal static class PagerHighlighting {
         string matchStyle,
         IReadOnlyList<PagerSearchHit> indexedHits
     ) {
-        HashSet<int> matchedRowsFromHits = ResolveGridRowsFromHitLines(source, indexedHits);
         bool[] rowCellMatches = [.. source.Rows.Select(row => row.Any(cell => RenderableContainsQuery(cell, query)))];
         bool hasAnyRowCellMatch = rowCellMatches.Any(static match => match);
+        HashSet<int> matchedRowsFromHits = hasAnyRowCellMatch
+            ? []
+            : ResolveGridRowsFromHitLines(source, indexedHits);
 
         var clone = new Grid {
             Expand = source.Expand,
@@ -187,7 +190,6 @@ internal static class PagerHighlighting {
 
         int rowIndex = 0;
         foreach (GridRow sourceRow in source.Rows) {
-            string[] cellTexts = [.. sourceRow.Select(ExtractRenderableText).Select(NormalizeText)];
             bool rowHasCellMatch = rowCellMatches[rowIndex];
             bool rowHasIndexedContextMatch = !hasAnyRowCellMatch && matchedRowsFromHits.Contains(rowIndex);
             bool rowHasMatch = rowHasCellMatch || rowHasIndexedContextMatch;
@@ -538,7 +540,10 @@ internal static class PagerHighlighting {
 
             return lines;
         }
-        catch {
+        catch (InvalidOperationException) {
+            return 0;
+        }
+        catch (IOException) {
             return 0;
         }
     }
@@ -563,9 +568,12 @@ internal static class PagerHighlighting {
             return renderable;
         }
 
+        var rowTextStyle = Style.Parse(rowStyle);
+        var matchTextStyle = Style.Parse(matchStyle);
+
         if (string.IsNullOrEmpty(query)) {
             return applyRowStyle
-                ? BuildHighlightedTextRenderable(plainText, [], Style.Parse(rowStyle), Style.Parse(matchStyle))
+                ? BuildHighlightedTextRenderable(plainText, [], rowTextStyle, matchTextStyle)
                 : renderable;
         }
 
@@ -583,7 +591,7 @@ internal static class PagerHighlighting {
 
         return hits.Count == 0 && !applyRowStyle
             ? renderable
-            : BuildHighlightedTextRenderable(plainText, hits, Style.Parse(rowStyle), Style.Parse(matchStyle));
+            : BuildHighlightedTextRenderable(plainText, hits, rowTextStyle, matchTextStyle);
     }
 
     private static string ExtractRenderableText(IRenderable renderable) {
@@ -610,7 +618,7 @@ internal static class PagerHighlighting {
                 return extracted;
             }
         }
-        catch {
+        catch (InvalidOperationException) {
         }
 
         try {
@@ -619,7 +627,10 @@ internal static class PagerHighlighting {
                 ? string.Empty
                 : rendered;
         }
-        catch {
+        catch (InvalidOperationException) {
+            return string.Empty;
+        }
+        catch (IOException) {
             return string.Empty;
         }
     }

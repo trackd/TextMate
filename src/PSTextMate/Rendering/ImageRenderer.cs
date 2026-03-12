@@ -35,22 +35,15 @@ public static class ImageRenderer {
             }
 
             // Use a timeout for image processing
-            string? localImagePath = null;
-            Task<string?> imageTask = Task.Run(async () => {
-                string? result = await ImageFile.NormalizeImageSourceAsync(imageUrl, CurrentMarkdownDirectory);
-                // Track what paths we're trying to resolve for error reporting
-                if (result is null && CurrentMarkdownDirectory is not null) {
+            if (!TryNormalizeImagePath(imageUrl, out string? localImagePath, out bool timedOut)) {
+                if (timedOut) {
+                    _lastImageError = $"Image download timeout after {ImageTimeout.TotalSeconds} seconds: {imageUrl}";
+                }
+                else if (CurrentMarkdownDirectory is not null) {
                     _lastImageError = $"Failed to resolve '{imageUrl}' with base directory '{CurrentMarkdownDirectory}'";
                 }
-                return result;
-            });
 
-            if (imageTask.Wait(ImageTimeout)) {
-                localImagePath = imageTask.Result;
-            }
-            else {
                 // Timeout occurred
-                _lastImageError = $"Image download timeout after {ImageTimeout.TotalSeconds} seconds: {imageUrl}";
                 return CreateImageFallback(altText, imageUrl);
             }
 
@@ -109,13 +102,7 @@ public static class ImageRenderer {
             }
 
             // Use a timeout for image processing
-            string? localImagePath = null;
-            Task<string?>? imageTask = Task.Run(async () => await ImageFile.NormalizeImageSourceAsync(imageUrl, CurrentMarkdownDirectory));
-
-            if (imageTask.Wait(ImageTimeout)) {
-                localImagePath = imageTask.Result;
-            }
-            else {
+            if (!TryNormalizeImagePath(imageUrl, out string? localImagePath, out bool timedOut) || timedOut) {
                 // Timeout occurred
                 return CreateImageFallbackInline(altText, imageUrl);
             }
@@ -136,7 +123,19 @@ public static class ImageRenderer {
                 return CreateImageFallbackInline(altText, imageUrl);
             }
         }
-        catch {
+        catch (InvalidOperationException) {
+            // If anything goes wrong, fall back to the link representation
+            return CreateImageFallbackInline(altText, imageUrl);
+        }
+        catch (HttpRequestException) {
+            // If anything goes wrong, fall back to the link representation
+            return CreateImageFallbackInline(altText, imageUrl);
+        }
+        catch (IOException) {
+            // If anything goes wrong, fall back to the link representation
+            return CreateImageFallbackInline(altText, imageUrl);
+        }
+        catch (TaskCanceledException) {
             // If anything goes wrong, fall back to the link representation
             return CreateImageFallbackInline(altText, imageUrl);
         }
@@ -147,6 +146,33 @@ public static class ImageRenderer {
     /// </summary>
     private static bool TryCreateSixelRenderable(string imagePath, int? maxWidth, int? maxHeight, out IRenderable? result)
         => TryCreatePixelImage(imagePath, maxWidth, maxHeight, out result);
+
+    private static bool TryNormalizeImagePath(string imageUrl, out string? localImagePath, out bool timedOut) {
+        localImagePath = null;
+        timedOut = false;
+
+        try {
+            Task<string?> task = ImageFile.NormalizeImageSourceAsync(imageUrl, CurrentMarkdownDirectory);
+            localImagePath = task.WaitAsync(ImageTimeout).GetAwaiter().GetResult();
+            return true;
+        }
+        catch (TimeoutException) {
+            timedOut = true;
+            return false;
+        }
+        catch (InvalidOperationException) {
+            return false;
+        }
+        catch (HttpRequestException) {
+            return false;
+        }
+        catch (IOException) {
+            return false;
+        }
+        catch (TaskCanceledException) {
+            return false;
+        }
+    }
 
     /// <summary>
     /// Attempts to create a local PixelImage backed by the new sixel implementation.
@@ -221,7 +247,10 @@ public static class ImageRenderer {
                 .Border(BoxBorder.Rounded)
                 .BorderColor(Color.Grey);
         }
-        catch {
+        catch (InvalidOperationException) {
+            return CreateImageFallback(altText, imageUrl);
+        }
+        catch (IOException) {
             return CreateImageFallback(altText, imageUrl);
         }
     }
@@ -258,7 +287,10 @@ public static class ImageRenderer {
         try {
             return Compatibility.TerminalSupportsSixel();
         }
-        catch {
+        catch (InvalidOperationException) {
+            return false;
+        }
+        catch (IOException) {
             return false;
         }
     }

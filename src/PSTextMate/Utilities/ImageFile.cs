@@ -9,6 +9,7 @@ namespace PSTextMate.Utilities;
 internal static partial class ImageFile {
     private static readonly HttpClient HttpClient = new();
     private static readonly string[] SupportedExtensions = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"];
+    private static readonly TimeSpan TempFileCleanupDelay = TimeSpan.FromHours(1);
 
     [GeneratedRegex(@"^data:image\/(?<type>[a-zA-Z]+);base64,(?<data>[A-Za-z0-9+/=]+)$", RegexOptions.Compiled)]
     private static partial Regex Base64Regex();
@@ -88,21 +89,17 @@ internal static partial class ImageFile {
 
             await File.WriteAllBytesAsync(tempFileName, imageBytes);
 
-            // Schedule cleanup after a reasonable time (1 hour)
-            _ = Task.Delay(TimeSpan.FromHours(1)).ContinueWith(_ => {
-                try {
-                    if (File.Exists(tempFileName)) {
-                        File.Delete(tempFileName);
-                    }
-                }
-                catch {
-                    // Ignore cleanup errors
-                }
-            });
+            ScheduleTempFileCleanup(tempFileName);
 
             return tempFileName;
         }
-        catch {
+        catch (FormatException) {
+            return null;
+        }
+        catch (IOException) {
+            return null;
+        }
+        catch (UnauthorizedAccessException) {
             return null;
         }
     }
@@ -129,22 +126,40 @@ internal static partial class ImageFile {
             using FileStream fileStream = File.Create(tempFileName);
             await response.Content.CopyToAsync(fileStream);
 
-            // Schedule cleanup after a reasonable time (1 hour)
-            _ = Task.Delay(TimeSpan.FromHours(1)).ContinueWith(_ => {
-                try {
-                    if (File.Exists(tempFileName)) {
-                        File.Delete(tempFileName);
-                    }
-                }
-                catch {
-                    // Ignore cleanup errors
-                }
-            });
+            ScheduleTempFileCleanup(tempFileName);
 
             return tempFileName;
         }
-        catch {
+        catch (HttpRequestException) {
             return null;
+        }
+        catch (TaskCanceledException) {
+            return null;
+        }
+        catch (IOException) {
+            return null;
+        }
+        catch (UnauthorizedAccessException) {
+            return null;
+        }
+    }
+
+    private static void ScheduleTempFileCleanup(string tempFileName) {
+        _ = DeleteTempFileLaterAsync(tempFileName);
+    }
+
+    private static async Task DeleteTempFileLaterAsync(string tempFileName) {
+        try {
+            await Task.Delay(TempFileCleanupDelay).ConfigureAwait(false);
+            if (File.Exists(tempFileName)) {
+                File.Delete(tempFileName);
+            }
+        }
+        catch (IOException) {
+            // Best effort cleanup only.
+        }
+        catch (UnauthorizedAccessException) {
+            // Best effort cleanup only.
         }
     }
 

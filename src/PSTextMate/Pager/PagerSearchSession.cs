@@ -11,6 +11,7 @@ internal sealed record PagerSearchHit(
 internal sealed class PagerSearchSession {
     private readonly PagerDocument _document;
     private readonly List<PagerSearchHit> _hits = [];
+    private readonly Dictionary<int, List<PagerSearchHit>> _hitsByRenderable = [];
     private static readonly IReadOnlyList<PagerSearchHit> s_noHits = [];
     public string Query { get; private set; } = string.Empty;
     public int CurrentHitIndex { get; private set; } = -1;
@@ -63,31 +64,14 @@ internal sealed class PagerSearchSession {
     }
 
     public IReadOnlyList<PagerSearchHit> GetHitsForRenderable(int renderableIndex) {
-        if (_hits.Count == 0) {
-            return s_noHits;
-        }
-
-        List<PagerSearchHit>? matches = null;
-        foreach (PagerSearchHit hit in _hits) {
-            if (hit.RenderableIndex != renderableIndex) {
-                continue;
-            }
-
-            matches ??= [];
-            matches.Add(hit);
-        }
-
-        return matches ?? s_noHits;
+        return _hitsByRenderable.TryGetValue(renderableIndex, out List<PagerSearchHit>? matches)
+            ? matches
+            : s_noHits;
     }
-
-    public bool IsCurrentHit(PagerSearchHit hit)
-        => CurrentHit is PagerSearchHit current
-            && current.RenderableIndex == hit.RenderableIndex
-            && current.Offset == hit.Offset
-            && current.Length == hit.Length;
 
     private void RebuildHits() {
         _hits.Clear();
+        _hitsByRenderable.Clear();
         CurrentHitIndex = -1;
 
         if (!HasQuery) {
@@ -107,11 +91,20 @@ internal sealed class PagerSearchSession {
                 }
 
                 (int line, int column) = ResolveLineColumn(entry.LineStarts, hitOffset);
-                _hits.Add(new PagerSearchHit(entry.RenderableIndex, hitOffset, Query.Length, line, column));
+                var hit = new PagerSearchHit(entry.RenderableIndex, hitOffset, Query.Length, line, column);
+                _hits.Add(hit);
+
+                if (!_hitsByRenderable.TryGetValue(entry.RenderableIndex, out List<PagerSearchHit>? existing)) {
+                    _hitsByRenderable[entry.RenderableIndex] = [hit];
+                }
+                else {
+                    existing.Add(hit);
+                }
 
                 searchStart = hitOffset + Math.Max(1, Query.Length);
             }
         }
+
     }
 
     private static (int line, int column) ResolveLineColumn(int[] lineStarts, int offset) {
@@ -119,14 +112,8 @@ internal sealed class PagerSearchSession {
             return (0, offset);
         }
 
-        int line = 0;
-        for (int i = 1; i < lineStarts.Length; i++) {
-            if (lineStarts[i] > offset) {
-                break;
-            }
-
-            line = i;
-        }
+        int line = Array.BinarySearch(lineStarts, offset);
+        line = line >= 0 ? line : Math.Max(0, (~line) - 1);
 
         int column = offset - lineStarts[line];
         return (line, Math.Max(0, column));

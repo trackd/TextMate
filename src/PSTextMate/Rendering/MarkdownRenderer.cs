@@ -80,12 +80,6 @@ internal static class MarkdownRenderer {
     }
 
     /// <summary>
-    /// Returns true for blocks that render with visual borders and need padding.
-    /// </summary>
-    private static bool IsBorderedBlock(Block block) =>
-        block is QuoteBlock or FencedCodeBlock or HtmlBlock or Markdig.Extensions.Tables.Table;
-
-    /// <summary>
     /// Creates the Markdig pipeline with all necessary extensions and trivia tracking enabled.
     /// Pipeline follows Markdig's roundtrip parser design pattern - see:
     /// https://github.com/xoofx/markdig/blob/master/src/Markdig/Roundtrip.md

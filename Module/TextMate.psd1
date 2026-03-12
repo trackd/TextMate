@@ -23,6 +23,7 @@
         'fps'
         'ftm'
         'Show-TextMate'
+        'page'
     )
     FormatsToProcess     = 'TextMate.format.ps1xml'
     RequiredModules      = @(

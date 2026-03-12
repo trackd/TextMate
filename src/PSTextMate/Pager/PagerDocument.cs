@@ -3,10 +3,14 @@
 internal sealed record PagerDocumentEntry(
     int RenderableIndex,
     IRenderable Renderable,
-    string SearchText,
-    int[] LineStarts,
+    Func<string> GetSearchText,
+    Func<int[]> GetLineStarts,
     bool IsImage
-);
+) {
+    public string SearchText => GetSearchText();
+
+    public int[] LineStarts => GetLineStarts();
+}
 
 internal sealed class PagerDocument {
     private readonly List<PagerDocumentEntry> _entries = [];
@@ -22,9 +26,22 @@ internal sealed class PagerDocument {
         int index = 0;
         foreach (IRenderable renderable in renderables) {
             bool isImage = IsImageRenderable(renderable);
-            string searchText = isImage ? string.Empty : ExtractSearchText(renderable);
-            int[] lineStarts = BuildLineStarts(searchText);
-            _entries.Add(new PagerDocumentEntry(index, renderable, searchText, lineStarts, isImage));
+            Lazy<string> lazySearchText = new(
+                () => isImage ? string.Empty : ExtractSearchText(renderable),
+                isThreadSafe: false
+            );
+            Lazy<int[]> lazyLineStarts = new(
+                () => BuildLineStarts(lazySearchText.Value),
+                isThreadSafe: false
+            );
+
+            _entries.Add(new PagerDocumentEntry(
+                index,
+                renderable,
+                () => lazySearchText.Value,
+                () => lazyLineStarts.Value,
+                isImage
+            ));
             renderableList.Add(renderable);
             index++;
         }
@@ -55,7 +72,10 @@ internal sealed class PagerDocument {
                 ? normalized
                 : Normalize(renderable.ToString());
         }
-        catch {
+        catch (InvalidOperationException) {
+            return Normalize(renderable.ToString());
+        }
+        catch (IOException) {
             return Normalize(renderable.ToString());
         }
     }

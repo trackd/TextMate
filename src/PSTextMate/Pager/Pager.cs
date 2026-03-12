@@ -30,7 +30,6 @@ public sealed class Pager {
     private int _top;
     private int WindowHeight;
     private int WindowWidth;
-    private readonly object _lock = new();
     private int _lastRenderedRows;
     private bool _lastPageHadImages;
     private string _searchStatusText = string.Empty;
@@ -41,6 +40,7 @@ public sealed class Pager {
     private static readonly Style SearchMatchTextStyle = new(Color.Black, Color.Orange1);
     private const string SearchRowStyle = "white on grey";
     private const string SearchMatchStyle = "black on orange1";
+    private const int KeyPollingIntervalMs = 50;
 
     private bool TryReadKey(out ConsoleKeyInfo key) {
         if (_tryReadKeyOverride is not null) {
@@ -231,93 +231,91 @@ public sealed class Pager {
 
             // Wait for input, checking for resize while idle.
             if (!TryReadKey(out ConsoleKeyInfo key)) {
-                Thread.Sleep(50);
+                Thread.Sleep(KeyPollingIntervalMs);
                 continue;
             }
 
-            lock (_lock) {
-                if (_isSearchInputActive) {
-                    HandleSearchInputKey(key, ref forceRedraw);
+            if (_isSearchInputActive) {
+                HandleSearchInputKey(key, ref forceRedraw);
+                continue;
+            }
+
+            if (_isHelpOverlayActive) {
+                if (key.Key == ConsoleKey.Q) {
+                    running = false;
                     continue;
                 }
 
-                if (_isHelpOverlayActive) {
-                    if (key.Key == ConsoleKey.Q) {
-                        running = false;
-                        continue;
+                _isHelpOverlayActive = false;
+                forceRedraw = true;
+
+                if (key.Key == ConsoleKey.Escape || key.KeyChar == '?') {
+                    continue;
+                }
+
+                continue;
+            }
+
+            bool isCtrlF = key.Key == ConsoleKey.F && (key.Modifiers & ConsoleModifiers.Control) != 0;
+            if (key.KeyChar == '/' || isCtrlF) {
+                BeginSearchInput();
+                forceRedraw = true;
+                continue;
+            }
+
+            if (key.KeyChar == '?') {
+                _isHelpOverlayActive = true;
+                forceRedraw = true;
+                continue;
+            }
+
+            switch (key.Key) {
+                case ConsoleKey.DownArrow:
+                    ScrollRenderable(1, contentRows);
+                    forceRedraw = true;
+                    break;
+                case ConsoleKey.UpArrow:
+                    ScrollRenderable(-1, contentRows);
+                    forceRedraw = true;
+                    break;
+                case ConsoleKey.Spacebar:
+                case ConsoleKey.PageDown:
+                    PageDown(contentRows);
+                    forceRedraw = true;
+                    break;
+                case ConsoleKey.PageUp:
+                    PageUp(contentRows);
+                    forceRedraw = true;
+                    break;
+                case ConsoleKey.Home:
+                    GoToTop();
+                    forceRedraw = true;
+                    break;
+                case ConsoleKey.End:
+                    GoToEnd(contentRows);
+                    forceRedraw = true;
+                    break;
+                case ConsoleKey.N:
+                    if ((key.Modifiers & ConsoleModifiers.Shift) != 0) {
+                        JumpToPreviousMatch();
+                    }
+                    else {
+                        JumpToNextMatch();
                     }
 
-                    _isHelpOverlayActive = false;
                     forceRedraw = true;
-
-                    if (key.Key == ConsoleKey.Escape || key.KeyChar == '?') {
-                        continue;
+                    break;
+                case ConsoleKey.C:
+                    if (_search.HasQuery) {
+                        ClearSearch();
+                        forceRedraw = true;
                     }
 
-                    continue;
-                }
-
-                bool isCtrlF = key.Key == ConsoleKey.F && (key.Modifiers & ConsoleModifiers.Control) != 0;
-                if (key.KeyChar == '/' || isCtrlF) {
-                    BeginSearchInput();
-                    forceRedraw = true;
-                    continue;
-                }
-
-                if (key.KeyChar == '?') {
-                    _isHelpOverlayActive = true;
-                    forceRedraw = true;
-                    continue;
-                }
-
-                switch (key.Key) {
-                    case ConsoleKey.DownArrow:
-                        ScrollRenderable(1, contentRows);
-                        forceRedraw = true;
-                        break;
-                    case ConsoleKey.UpArrow:
-                        ScrollRenderable(-1, contentRows);
-                        forceRedraw = true;
-                        break;
-                    case ConsoleKey.Spacebar:
-                    case ConsoleKey.PageDown:
-                        PageDown(contentRows);
-                        forceRedraw = true;
-                        break;
-                    case ConsoleKey.PageUp:
-                        PageUp(contentRows);
-                        forceRedraw = true;
-                        break;
-                    case ConsoleKey.Home:
-                        GoToTop();
-                        forceRedraw = true;
-                        break;
-                    case ConsoleKey.End:
-                        GoToEnd(contentRows);
-                        forceRedraw = true;
-                        break;
-                    case ConsoleKey.N:
-                        if ((key.Modifiers & ConsoleModifiers.Shift) != 0) {
-                            JumpToPreviousMatch();
-                        }
-                        else {
-                            JumpToNextMatch();
-                        }
-
-                        forceRedraw = true;
-                        break;
-                    case ConsoleKey.C:
-                        if (_search.HasQuery) {
-                            ClearSearch();
-                            forceRedraw = true;
-                        }
-
-                        break;
-                    case ConsoleKey.Q:
-                    case ConsoleKey.Escape:
-                        running = false;
-                        break;
-                }
+                    break;
+                case ConsoleKey.Q:
+                case ConsoleKey.Escape:
+                    running = false;
+                    break;
             }
         }
     }
@@ -623,7 +621,10 @@ public sealed class Pager {
                 ? normalized
                 : PagerHighlighting.NormalizeText(renderable.ToString());
         }
-        catch {
+        catch (InvalidOperationException) {
+            return PagerHighlighting.NormalizeText(renderable.ToString());
+        }
+        catch (IOException) {
             return PagerHighlighting.NormalizeText(renderable.ToString());
         }
     }

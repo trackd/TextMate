@@ -239,70 +239,6 @@ public sealed class HighlightedText : Renderable {
         return lineBreaks == 0 ? 1 : segments[^1].IsLineBreak ? lineBreaks : lineBreaks + 1;
     }
 
-    // Helper used by external callers to measure this instance's renderables by
-    // height (in rows) for a given width. Returns an array of heights aligned
-    // with the current `Renderables` array (or the underlying source when a
-    // view is active).
-    public int[] MeasureRenderables(int width) {
-        Capabilities caps = AnsiConsole.Console.Profile.Capabilities;
-        var size = new Size(width, Math.Max(1, Console.WindowHeight));
-        var options = new RenderOptions(caps, size);
-
-        IEnumerable<IRenderable> source = _viewSource is null ? Renderables : _viewSource;
-        var list = new List<int>(source.Count());
-
-        foreach (IRenderable? r in source) {
-            if (r is null) {
-                list.Add(0);
-                continue;
-            }
-
-            try {
-                // Prefer Measure() to avoid rendering side-effects (images, sixels).
-                Measurement m = r.Measure(options, width);
-                int maxWidth = Math.Max(1, m.Max);
-                int estimatedLines = maxWidth <= width ? 1 : (int)Math.Ceiling((double)maxWidth / width);
-                list.Add(Math.Max(1, estimatedLines));
-            }
-            catch {
-                list.Add(1);
-            }
-        }
-
-        return [.. list];
-    }
-
-    /// <summary>
-    /// Measure each renderable and return the full Measurement for each item.
-    /// This is similar to <see cref="MeasureRenderables"/> but preserves the
-    /// Measurement (min/max) which callers can use to compute both width and
-    /// estimated height.
-    /// </summary>
-    public Measurement[] MeasureRenderablesFull(int width) {
-        Capabilities caps = AnsiConsole.Console.Profile.Capabilities;
-        var size = new Size(width, Math.Max(1, Console.WindowHeight));
-        var options = new RenderOptions(caps, size);
-
-        IEnumerable<IRenderable> source = _viewSource is null ? Renderables : _viewSource;
-        var list = new List<Measurement>(source.Count());
-
-        foreach (IRenderable? r in source) {
-            if (r is null) {
-                list.Add(new Measurement(1, 1));
-                continue;
-            }
-
-            try {
-                Measurement m = r.Measure(options, width);
-                list.Add(m);
-            }
-            catch {
-                list.Add(new Measurement(1, 1));
-            }
-        }
-
-        return [.. list];
-    }
 
     private int ResolveLineNumberWidth(int lineCount) {
         if (LineNumberWidth.HasValue && LineNumberWidth.Value > 0) {
@@ -358,38 +294,11 @@ public sealed class HighlightedText : Renderable {
     /// <param name="size">Padding size for all sides</param>
     /// <returns>Padder containing the highlighted text</returns>
     public Padder WithPadding(int size) => new(this, new Padding(size));
-    /// <summary>
-    /// Create a page-scoped HighlightedText that reuses this instance's settings
-    /// but contains only a slice of the underlying renderables.
-    /// </summary>
-    /// <param name="start">Zero-based start index into <see cref="Renderables"/>.</param>
-    /// <param name="count">Number of renderables to include.</param>
-    /// <param name="overrideLineNumberWidth">Optional stable gutter width to apply to the slice.</param>
-    /// <returns>A new <see cref="HighlightedText"/> representing the requested slice.</returns>
-    public HighlightedText Slice(int start, int count, int? overrideLineNumberWidth = null) {
-        return new HighlightedText {
-            Renderables = [.. Renderables.Skip(start).Take(count)],
-            ShowLineNumbers = ShowLineNumbers,
-            LineNumberStart = LineNumberStart + start,
-            LineNumberWidth = overrideLineNumberWidth ?? LineNumberWidth,
-            GutterSeparator = GutterSeparator,
-            Language = Language,
-            WrapInPanel = WrapInPanel,
-            Page = Page
-        };
-    }
     public void ShowPager() {
         if (LineCount <= 0) return;
 
         var pager = new Pager(this);
         pager.Show();
-    }
-    public IRenderable? AutoPage() {
-        if (LineCount > Console.WindowHeight - 2) {
-            ShowPager();
-            return null;
-        }
-        return this;
     }
 
     /// <summary>

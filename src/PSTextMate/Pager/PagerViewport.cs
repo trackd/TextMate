@@ -6,6 +6,10 @@ internal sealed class PagerViewportEngine {
     private readonly IReadOnlyList<IRenderable> _renderables;
     private readonly HighlightedText? _sourceHighlightedText;
     private List<int> _renderableHeights = [];
+    private int _lastWidth = -1;
+    private int _lastContentRows = -1;
+    private int _lastWindowHeight = -1;
+    private int _lastRenderableCount = -1;
 
     public PagerViewportEngine(IReadOnlyList<IRenderable> renderables, HighlightedText? sourceHighlightedText) {
         _renderables = renderables ?? throw new ArgumentNullException(nameof(renderables));
@@ -14,6 +18,14 @@ internal sealed class PagerViewportEngine {
 
     public void RecalculateHeights(int width, int contentRows, int windowHeight, IAnsiConsole console) {
         ArgumentNullException.ThrowIfNull(console);
+
+        if (_renderableHeights.Count == _renderables.Count
+            && _lastWidth == width
+            && _lastContentRows == contentRows
+            && _lastWindowHeight == windowHeight
+            && _lastRenderableCount == _renderables.Count) {
+            return;
+        }
 
         _renderableHeights = new List<int>(_renderables.Count);
         Capabilities capabilities = console.Profile.Capabilities;
@@ -47,11 +59,20 @@ internal sealed class PagerViewportEngine {
                 int lines = CountLinesSegments(segments);
                 _renderableHeights.Add(Math.Max(1, lines));
             }
-            catch {
+            catch (InvalidOperationException) {
+                // Fallback: assume single-line if measurement fails.
+                _renderableHeights.Add(1);
+            }
+            catch (IOException) {
                 // Fallback: assume single-line if measurement fails.
                 _renderableHeights.Add(1);
             }
         }
+
+        _lastWidth = width;
+        _lastContentRows = contentRows;
+        _lastWindowHeight = windowHeight;
+        _lastRenderableCount = _renderables.Count;
     }
 
     public PagerViewportWindow BuildViewport(int proposedTop, int contentRows) {
@@ -202,7 +223,10 @@ internal sealed class PagerViewportEngine {
         try {
             measure = renderable.Measure(options, width);
         }
-        catch {
+        catch (InvalidOperationException) {
+            return Math.Clamp(contentRows, 1, contentRows);
+        }
+        catch (IOException) {
             return Math.Clamp(contentRows, 1, contentRows);
         }
 
