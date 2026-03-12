@@ -1,4 +1,4 @@
-﻿namespace PSTextMate.Terminal;
+namespace PSTextMate.Terminal;
 
 internal static class PagerHighlighting {
     internal static IRenderable BuildSegmentHighlightRenderable(
@@ -106,21 +106,26 @@ internal static class PagerHighlighting {
         }
 
         private static string BuildPlainText(IEnumerable<Segment> segments) {
-            var builder = new StringBuilder();
-            foreach (Segment segment in segments) {
-                if (segment.IsControlCode) {
-                    continue;
+            StringBuilder builder = StringBuilderPool.Rent();
+            try {
+                foreach (Segment segment in segments) {
+                    if (segment.IsControlCode) {
+                        continue;
+                    }
+
+                    if (segment.IsLineBreak) {
+                        builder.Append('\n');
+                        continue;
+                    }
+
+                    builder.Append(segment.Text);
                 }
 
-                if (segment.IsLineBreak) {
-                    builder.Append('\n');
-                    continue;
-                }
-
-                builder.Append(segment.Text);
+                return builder.ToString();
             }
-
-            return builder.ToString();
+            finally {
+                StringBuilderPool.Return(builder);
+            }
         }
 
         private static bool[] BuildLineMatchMask(string plainText, IReadOnlyList<PagerSearchHit> hits) {
@@ -166,36 +171,17 @@ internal static class PagerHighlighting {
             var output = new List<Segment>(source.Count * 2);
             int absolute = 0;
             int line = 0;
+            StringBuilder chunk = StringBuilderPool.Rent();
 
-            foreach (Segment segment in source) {
-                if (segment.IsControlCode) {
-                    output.Add(segment);
-                    continue;
-                }
-
-                if (segment.IsLineBreak) {
-                    output.Add(segment);
-                    if (absolute < matchMask.Length) {
-                        absolute++;
+            try {
+                foreach (Segment segment in source) {
+                    if (segment.IsControlCode) {
+                        output.Add(segment);
+                        continue;
                     }
 
-                    line = Math.Min(line + 1, lineHasMatch.Length - 1);
-                    continue;
-                }
-
-                if (segment.Text.Length == 0) {
-                    continue;
-                }
-
-                bool segmentLinkMatchesQuery = highlightLinkedLabels && SegmentLinkMatchesQuery(segment, _query);
-
-                var chunk = new StringBuilder();
-                Style? chunkStyle = null;
-
-                foreach (char ch in segment.Text) {
-                    if (ch == '\n') {
-                        FlushChunk(output, chunk, chunkStyle);
-                        output.Add(Segment.LineBreak);
+                    if (segment.IsLineBreak) {
+                        output.Add(segment);
                         if (absolute < matchMask.Length) {
                             absolute++;
                         }
@@ -204,24 +190,58 @@ internal static class PagerHighlighting {
                         continue;
                     }
 
-                    bool inMatch = absolute >= 0 && absolute < matchMask.Length && matchMask[absolute];
-                    bool inMatchedLine = line >= 0 && line < lineHasMatch.Length && lineHasMatch[line];
-                    Style style = inMatch || segmentLinkMatchesQuery
-                        ? _matchStyle
-                        : inMatchedLine
-                        ? _rowStyle
-                        : segment.Style;
-
-                    if (chunkStyle is null || !chunkStyle.Equals(style)) {
-                        FlushChunk(output, chunk, chunkStyle);
-                        chunkStyle = style;
+                    if (segment.Text.Length == 0) {
+                        continue;
                     }
 
-                    chunk.Append(ch);
-                    absolute++;
-                }
+                    bool segmentLinkMatchesQuery = highlightLinkedLabels && SegmentLinkMatchesQuery(segment, _query);
 
-                FlushChunk(output, chunk, chunkStyle);
+                    chunk.Clear();
+                    Style? chunkStyle = null;
+
+                    foreach (char ch in segment.Text) {
+                        if (ch == '\n') {
+                            FlushChunk(output, chunk, chunkStyle);
+                            output.Add(Segment.LineBreak);
+                            if (absolute < matchMask.Length) {
+                                absolute++;
+                            }
+
+                            line = Math.Min(line + 1, lineHasMatch.Length - 1);
+                            continue;
+                        }
+
+                        bool inMatch = absolute >= 0 && absolute < matchMask.Length && matchMask[absolute];
+                        bool inMatchedLine = line >= 0 && line < lineHasMatch.Length && lineHasMatch[line];
+                        Style style;
+                        if (ch == '│') {
+                            // leave borders as is.
+                            style = segment.Style;
+                        }
+                        else if (inMatch || segmentLinkMatchesQuery) {
+                            style = _matchStyle;
+                        }
+                        else if (inMatchedLine) {
+                            style = _rowStyle;
+                        }
+                        else {
+                            style = segment.Style;
+                        }
+
+                        if (chunkStyle is null || !chunkStyle.Equals(style)) {
+                            FlushChunk(output, chunk, chunkStyle);
+                            chunkStyle = style;
+                        }
+
+                        chunk.Append(ch);
+                        absolute++;
+                    }
+
+                    FlushChunk(output, chunk, chunkStyle);
+                }
+            }
+            finally {
+                StringBuilderPool.Return(chunk);
             }
 
             return output;

@@ -124,24 +124,11 @@ public sealed class OutPageCmdlet : PSCmdlet {
         }
     }
 
-    private static void AddLines(List<string> lines, string text) {
-        string normalized = text.Replace("\r\n", "\n", StringComparison.Ordinal)
-            .Replace('\r', '\n');
+    // Out-String -Stream commonly returns one chunk per logical line with a
+    // trailing newline terminator. Trim only that final synthetic empty line.
+    private static void AddLines(List<string> lines, string text) =>
 
-        string[] split = normalized.Split('\n');
-        int count = split.Length;
-
-        // Out-String -Stream commonly returns one chunk per logical line with a
-        // trailing newline terminator. Ignore only that terminator-induced empty
-        // entry so pager row counts match what is actually rendered.
-        if (count > 0 && split[^1].Length == 0 && normalized.EndsWith('\n')) {
-            count--;
-        }
-
-        for (int i = 0; i < count; i++) {
-            lines.Add(split[i]);
-        }
-    }
+        TextMateHelper.AddSplitLines(lines, text, trimTrailingTerminatorEmptyLine: true);
 
     private static int GetConsoleWidth() {
         try {

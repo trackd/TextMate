@@ -76,7 +76,7 @@ public sealed class PagerCoreTests {
     }
 
     [Fact]
-    public void SetQuery_CustomRenderableWithToStringFallback_FindsMatch() {
+    public void SetQuery_CustomRenderableWithoutRenderableText_DoesNotMatch() {
         PagerDocument document = new([
             new ThrowingRenderable("alpha beta"),
             new ThrowingRenderable("gamma")
@@ -86,18 +86,16 @@ public sealed class PagerCoreTests {
         session.SetQuery("beta");
 
         Assert.True(session.HasQuery);
-        Assert.Equal(1, session.HitCount);
-
-        PagerSearchHit? hit = session.MoveNext(topIndex: 0);
-        Assert.NotNull(hit);
-        Assert.Equal(0, hit.RenderableIndex);
+        Assert.Equal(0, session.HitCount);
+        Assert.Null(session.MoveNext(topIndex: 0));
     }
 
     [Fact]
-    public void SetQuery_FromHighlightedTextWithCustomRenderable_FindsMatch() {
-        HighlightedText highlighted = new() {
-            Renderables = [new ThrowingRenderable("search target")]
-        };
+    public void SetQuery_FromHighlightedTextWithSourceLines_FindsMatch() {
+        HighlightedText highlighted = new(
+            [new ThrowingRenderable("ignored render text")],
+            sourceLines: ["search target"]
+        );
 
         var document = PagerDocument.FromHighlightedText(highlighted);
         PagerSearchSession session = new(document);
@@ -108,7 +106,7 @@ public sealed class PagerCoreTests {
     }
 
     [Fact]
-    public void SetQuery_RenderableWithEmptyWriterOutput_UsesToStringFallback() {
+    public void SetQuery_RenderableWithEmptyWriterOutput_DoesNotMatch() {
         PagerDocument document = new([
             new EmptyRenderable("delta epsilon")
         ]);
@@ -116,8 +114,8 @@ public sealed class PagerCoreTests {
         PagerSearchSession session = new(document);
         session.SetQuery("epsilon");
 
-        Assert.Equal(1, session.HitCount);
-        Assert.NotNull(session.MoveNext(topIndex: 0));
+        Assert.Equal(0, session.HitCount);
+        Assert.Null(session.MoveNext(topIndex: 0));
     }
 
     [Fact]
@@ -201,6 +199,47 @@ public sealed class PagerCoreTests {
             && segment.Style.Background == Color.Orange1);
 
         Assert.True(hasHighlightedLabel);
+    }
+
+    [Fact]
+    public void SegmentHighlighter_DirectMatch_StylesRowTextButNotBorders() {
+        Style baseStyle = new(Color.Blue, Color.Black);
+        var text = new Text("Guide │ details", baseStyle);
+
+        IRenderable highlighted = PagerHighlighting.BuildSegmentHighlightRenderable(
+            text,
+            "Guide",
+            new Style(Color.White, Color.Grey),
+            new Style(Color.Black, Color.Orange1),
+            highlightLinkedLabelsOnNoDirectMatch: false
+        );
+
+        var options = RenderOptions.Create(AnsiConsole.Console);
+        List<Segment> segments = [.. highlighted.Render(options, 120)];
+
+        bool hasMatchSegment = segments.Any(segment =>
+            !segment.IsControlCode
+            && !segment.IsLineBreak
+            && segment.Text.Contains("Guide", StringComparison.Ordinal)
+            && segment.Style.Foreground == Color.Black
+            && segment.Style.Background == Color.Orange1);
+
+        bool hasRowBackgroundOnNonMatchText = segments.Any(segment =>
+            !segment.IsControlCode
+            && !segment.IsLineBreak
+            && !segment.Text.Contains('│')
+            && !segment.Text.Contains("Guide", StringComparison.Ordinal)
+            && segment.Style.Background == Color.Grey);
+
+        bool borderKeptOriginalStyle = segments.Any(segment =>
+            !segment.IsControlCode
+            && !segment.IsLineBreak
+            && segment.Text.Contains('│')
+            && segment.Style.Equals(baseStyle));
+
+        Assert.True(hasMatchSegment);
+        Assert.True(hasRowBackgroundOnNonMatchText);
+        Assert.True(borderKeptOriginalStyle);
     }
 
     private sealed class Osc8Renderable : IRenderable {

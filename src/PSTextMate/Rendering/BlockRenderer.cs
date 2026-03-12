@@ -89,18 +89,22 @@ internal static class BlockRenderer {
     /// Extracts alt text from an image link inline.
     /// </summary>
     private static string ExtractImageAltText(LinkInline imageLink) {
-        var textBuilder = new StringBuilder();
+        StringBuilder textBuilder = StringBuilderPool.Rent();
+        try {
+            foreach (Inline inline in imageLink) {
+                if (inline is LiteralInline literal) {
+                    textBuilder.Append(literal.Content.ToString());
+                }
+                else if (inline is CodeInline code) {
+                    textBuilder.Append(code.Content);
+                }
+            }
 
-        foreach (Inline inline in imageLink) {
-            if (inline is LiteralInline literal) {
-                textBuilder.Append(literal.Content.ToString());
-            }
-            else if (inline is CodeInline code) {
-                textBuilder.Append(code.Content);
-            }
+            string result = textBuilder.ToString();
+            return string.IsNullOrEmpty(result) ? "Image" : result;
         }
-
-        string result = textBuilder.ToString();
-        return string.IsNullOrEmpty(result) ? "Image" : result;
+        finally {
+            StringBuilderPool.Return(textBuilder);
+        }
     }
 }

@@ -84,22 +84,60 @@ internal sealed partial class PagerDocument {
             string visibleText = Normalize(VTHelpers.StripAnsi(rendered));
             string hyperlinkTargets = ExtractHyperlinkTargets(rendered);
 
-            return !string.IsNullOrEmpty(hyperlinkTargets)
-                ? string.IsNullOrEmpty(visibleText)
+            if (!string.IsNullOrEmpty(hyperlinkTargets)) {
+                return string.IsNullOrEmpty(visibleText)
                     ? hyperlinkTargets
-                    : $"{visibleText}\n{hyperlinkTargets}"
-                : !string.IsNullOrEmpty(visibleText)
-                ? visibleText
-                : Normalize(renderable.ToString());
+                    : $"{visibleText}\n{hyperlinkTargets}";
+            }
+
+            if (!string.IsNullOrEmpty(visibleText)) {
+                return visibleText;
+            }
+
+            string segmentText = ExtractSegmentText(renderable);
+            return !string.IsNullOrEmpty(segmentText) ? segmentText : string.Empty;
         }
         catch (InvalidOperationException) {
-            return Normalize(renderable.ToString());
+            return ExtractSegmentText(renderable);
         }
         catch (IOException) {
-            return Normalize(renderable.ToString());
+            return ExtractSegmentText(renderable);
         }
         catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException) {
-            return Normalize(renderable.ToString());
+            return ExtractSegmentText(renderable);
+        }
+    }
+
+    private static string ExtractSegmentText(IRenderable renderable) {
+        try {
+            var options = RenderOptions.Create(AnsiConsole.Console);
+            IEnumerable<Segment> segments = renderable.Render(options, maxWidth: 200);
+            StringBuilder builder = StringBuilderPool.Rent();
+            try {
+                foreach (Segment segment in segments) {
+                    if (segment.IsControlCode) {
+                        continue;
+                    }
+
+                    if (segment.IsLineBreak) {
+                        builder.Append('\n');
+                        continue;
+                    }
+
+                    builder.Append(segment.Text);
+                }
+
+                return Normalize(builder.ToString());
+            }
+            finally {
+                StringBuilderPool.Return(builder);
+            }
+        }
+        catch (InvalidOperationException) {
+            return string.Empty;
+        }
+        catch (IOException) {
+            return string.Empty;
         }
     }
 
