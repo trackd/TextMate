@@ -152,9 +152,7 @@ public sealed class OutPageCmdlet : PSCmdlet {
         }
     }
 
-    // Keep one-column slack so width-bound lines from Out-String do not
-    // wrap in the live pager viewport and skew row-height calculations.
-    private static int GetOutStringWidth() => Math.Max(20, GetConsoleWidth() - 1);
+    private static int GetOutStringWidth() => Math.Max(20, GetConsoleWidth() - 5);
 
     private static bool TryConvertForeignSpectreRenderable(
         object value,

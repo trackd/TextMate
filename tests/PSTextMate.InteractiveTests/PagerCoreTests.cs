@@ -1,5 +1,5 @@
-﻿using PSTextMate.Terminal;
-using PSTextMate.Core;
+﻿using PSTextMate.Core;
+using PSTextMate.Terminal;
 using PSTextMate.Utilities;
 using Spectre.Console;
 using Spectre.Console.Rendering;
@@ -155,6 +155,73 @@ public sealed class PagerCoreTests {
         int thirdPassRenders = first.RenderCallCount + second.RenderCallCount;
 
         Assert.True(thirdPassRenders > secondPassRenders);
+    }
+
+    [Fact]
+    public void SetQuery_LinkRenderable_MatchesLabelAndUrl() {
+        PagerDocument document = new([
+            new Text("Guide"),
+            new Osc8Renderable("Guide", "https://example.com/docs")
+        ]);
+        PagerSearchSession session = new(document);
+
+        session.SetQuery("Guide");
+        Assert.True(session.HitCount >= 1);
+        Assert.NotNull(session.MoveNext(topIndex: 0));
+
+        session.SetQuery("example.com/docs");
+        Assert.Equal(1, session.HitCount);
+
+        PagerSearchHit? urlHit = session.MoveNext(topIndex: 0);
+        Assert.NotNull(urlHit);
+        Assert.Equal(1, urlHit.RenderableIndex);
+    }
+
+    [Fact]
+    public void SegmentHighlighter_UrlMatch_HighlightsLinkLabel() {
+        var paragraph = new Paragraph();
+        SpectreStyleCompat.Append(paragraph, "Guide", Style.Plain, "https://example.com/docs");
+
+        IRenderable highlighted = PagerHighlighting.BuildSegmentHighlightRenderable(
+            paragraph,
+            "http",
+            new Style(Color.White, Color.Grey),
+            new Style(Color.Black, Color.Orange1),
+            highlightLinkedLabelsOnNoDirectMatch: true
+        );
+
+        var options = RenderOptions.Create(AnsiConsole.Console);
+        List<Segment> segments = [.. highlighted.Render(options, 120)];
+
+        bool hasHighlightedLabel = segments.Any(segment =>
+            !segment.IsControlCode
+            && !segment.IsLineBreak
+            && segment.Text.Contains("Guide", StringComparison.Ordinal)
+            && segment.Style.Foreground == Color.Black
+            && segment.Style.Background == Color.Orange1);
+
+        Assert.True(hasHighlightedLabel);
+    }
+
+    private sealed class Osc8Renderable : IRenderable {
+        private readonly string _label;
+        private readonly string _url;
+
+        public Osc8Renderable(string label, string url) {
+            _label = label;
+            _url = url;
+        }
+
+        public Measurement Measure(RenderOptions options, int maxWidth) {
+            int width = Math.Max(1, Math.Min(maxWidth, _label.Length));
+            return new Measurement(width, width);
+        }
+
+        public IEnumerable<Segment> Render(RenderOptions options, int maxWidth) {
+            string esc = "\x1b";
+            string osc8 = $"{esc}]8;;{_url}{esc}\\{_label}{esc}]8;;{esc}\\";
+            return [new Segment(osc8, Style.Plain)];
+        }
     }
 
     private sealed class ThrowingRenderable : IRenderable {

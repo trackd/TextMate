@@ -155,13 +155,13 @@ public abstract class TextMateCmdletBase : PSCmdlet {
 
         return renderables is null
             ? null
-            : new HighlightedText {
-                Renderables = renderables,
-                ShowLineNumbers = LineNumbers.IsPresent,
-                Language = token,
-                // WrapInPanel = Panel.IsPresent,
-                Page = Page.IsPresent
-            };
+            : new HighlightedText(
+                renderables,
+                showLineNumbers: LineNumbers.IsPresent,
+                language: token,
+                page: Page.IsPresent,
+                sourceLines: Page.IsPresent ? lines : null
+            );
     }
 
     private void EmitHighlightedResult(HighlightedText result) {
@@ -191,13 +191,13 @@ public abstract class TextMateCmdletBase : PSCmdlet {
         IRenderable[]? renderables = TextMateProcessor.ProcessLines(lines, Theme, token, isExtension: asExtension, forceAlternate: UseAlternate);
 
         if (renderables is not null) {
-            yield return new HighlightedText {
-                Renderables = renderables,
-                ShowLineNumbers = LineNumbers.IsPresent,
-                Language = token,
-                // WrapInPanel = Panel.IsPresent,
-                Page = Page.IsPresent
-            };
+            yield return new HighlightedText(
+                renderables,
+                showLineNumbers: LineNumbers.IsPresent,
+                language: token,
+                page: Page.IsPresent,
+                sourceLines: Page.IsPresent ? lines : null
+            );
         }
     }
 

@@ -4,15 +4,20 @@ namespace PSTextMate.Rendering;
 /// Handles rendering of images in markdown using Sixel format when possible.
 /// </summary>
 public static class ImageRenderer {
-    private static string? _lastSixelError;
-    private static string? _lastImageError;
+    private static readonly AsyncLocal<string?> s_lastSixelError = new();
+    private static readonly AsyncLocal<string?> s_lastImageError = new();
+    private static readonly AsyncLocal<string?> s_currentMarkdownDirectory = new();
+
     private static readonly TimeSpan ImageTimeout = TimeSpan.FromSeconds(5); // Increased to 5 seconds
 
     /// <summary>
     /// The base directory for resolving relative image paths in markdown.
     /// Set this before rendering markdown content to enable relative path resolution.
     /// </summary>
-    public static string? CurrentMarkdownDirectory { get; set; }
+    public static string? CurrentMarkdownDirectory {
+        get => s_currentMarkdownDirectory.Value;
+        set => s_currentMarkdownDirectory.Value = value;
+    }
 
     /// <summary>
     /// Renders an image using Sixel format if possible, otherwise falls back to a link.
@@ -25,22 +30,22 @@ public static class ImageRenderer {
     public static IRenderable RenderImage(string altText, string imageUrl, int? maxWidth = null, int? maxHeight = null) {
         try {
             // Clear previous errors
-            _lastImageError = null;
-            _lastSixelError = null;
+            s_lastImageError.Value = null;
+            s_lastSixelError.Value = null;
 
             // Check if the image format is likely supported
             if (!ImageFile.IsLikelySupportedImageFormat(imageUrl, CurrentMarkdownDirectory)) {
-                _lastImageError = $"Unsupported image format: {imageUrl}";
+                SetLastImageError($"Unsupported image format: {imageUrl}");
                 return CreateImageFallback(altText, imageUrl);
             }
 
             // Use a timeout for image processing
             if (!TryNormalizeImagePath(imageUrl, out string? localImagePath, out bool timedOut)) {
                 if (timedOut) {
-                    _lastImageError = $"Image download timeout after {ImageTimeout.TotalSeconds} seconds: {imageUrl}";
+                    SetLastImageError($"Image download timeout after {ImageTimeout.TotalSeconds} seconds: {imageUrl}");
                 }
                 else if (CurrentMarkdownDirectory is not null) {
-                    _lastImageError = $"Failed to resolve '{imageUrl}' with base directory '{CurrentMarkdownDirectory}'";
+                    SetLastImageError($"Failed to resolve '{imageUrl}' with base directory '{CurrentMarkdownDirectory}'");
                 }
 
                 // Timeout occurred
@@ -48,19 +53,19 @@ public static class ImageRenderer {
             }
 
             if (localImagePath is null) {
-                _lastImageError = $"Failed to normalize image source: {imageUrl}";
+                SetLastImageError($"Failed to normalize image source: {imageUrl}");
                 return CreateImageFallback(altText, imageUrl);
             }
 
             // Verify the downloaded file exists and has content
             if (!File.Exists(localImagePath)) {
-                _lastImageError = $"Downloaded image file does not exist: {localImagePath}";
+                SetLastImageError($"Downloaded image file does not exist: {localImagePath}");
                 return CreateImageFallback(altText, imageUrl);
             }
 
             var fileInfo = new FileInfo(localImagePath);
             if (fileInfo.Length == 0) {
-                _lastImageError = $"Downloaded image file is empty: {localImagePath} (0 bytes)";
+                SetLastImageError($"Downloaded image file is empty: {localImagePath} (0 bytes)");
                 return CreateImageFallback(altText, imageUrl);
             }
 
@@ -75,13 +80,26 @@ public static class ImageRenderer {
             }
             else {
                 // Fallback to enhanced link representation with file info
-                _lastImageError = $"SixelImage creation failed. File: {localImagePath} ({fileInfo.Length} bytes). Sixel error: {_lastSixelError}";
+                SetLastImageError($"SixelImage creation failed. File: {localImagePath} ({fileInfo.Length} bytes). Sixel error: {s_lastSixelError.Value}");
                 return CreateEnhancedImageFallback(altText, imageUrl, localImagePath);
             }
         }
-        catch (Exception ex) {
+        catch (InvalidOperationException ex) {
             // If anything goes wrong, fall back to the basic link representation
-            _lastImageError = $"Exception in RenderImage: {ex.Message}";
+            SetLastImageError($"Exception in RenderImage: {ex.Message}");
+            return CreateImageFallback(altText, imageUrl);
+        }
+        catch (IOException ex) {
+            // If anything goes wrong, fall back to the basic link representation
+            SetLastImageError($"Exception in RenderImage: {ex.Message}");
+            return CreateImageFallback(altText, imageUrl);
+        }
+        catch (HttpRequestException ex) {
+            SetLastImageError($"Exception in RenderImage: {ex.Message}");
+            return CreateImageFallback(altText, imageUrl);
+        }
+        catch (TaskCanceledException ex) {
+            SetLastImageError($"Exception in RenderImage: {ex.Message}");
             return CreateImageFallback(altText, imageUrl);
         }
     }
@@ -118,25 +136,20 @@ public static class ImageRenderer {
             if (TryCreateSixelRenderable(localImagePath, width, height, out IRenderable? sixelImage) && sixelImage is not null) {
                 return sixelImage;
             }
-            else {
-                // Fallback to inline link representation
-                return CreateImageFallbackInline(altText, imageUrl);
-            }
+            // Fallback to inline link representation
+            return CreateImageFallbackInline(altText, imageUrl);
         }
+        // If anything goes wrong, fall back to the link representation
         catch (InvalidOperationException) {
-            // If anything goes wrong, fall back to the link representation
             return CreateImageFallbackInline(altText, imageUrl);
         }
         catch (HttpRequestException) {
-            // If anything goes wrong, fall back to the link representation
             return CreateImageFallbackInline(altText, imageUrl);
         }
         catch (IOException) {
-            // If anything goes wrong, fall back to the link representation
             return CreateImageFallbackInline(altText, imageUrl);
         }
         catch (TaskCanceledException) {
-            // If anything goes wrong, fall back to the link representation
             return CreateImageFallbackInline(altText, imageUrl);
         }
     }
@@ -182,12 +195,12 @@ public static class ImageRenderer {
 
         try {
             if (!Compatibility.TerminalSupportsSixel()) {
-                _lastSixelError = "Terminal does not report Sixel support.";
+                SetLastSixelError("Terminal does not report Sixel support.");
                 return false;
             }
 
             if (!File.Exists(imagePath)) {
-                _lastSixelError = $"Image file not found: {imagePath}";
+                SetLastSixelError($"Image file not found: {imagePath}");
                 return false;
             }
 
@@ -200,7 +213,7 @@ public static class ImageRenderer {
             // MaxHeight is handled internally by PixelImage through terminal-height based clipping
             // when MaxWidth is not explicitly user-limited.
             if (maxHeight.HasValue && maxHeight.Value <= 0) {
-                _lastSixelError = "MaxHeight must be greater than zero when specified.";
+                SetLastSixelError("MaxHeight must be greater than zero when specified.");
                 return false;
             }
 
@@ -208,7 +221,7 @@ public static class ImageRenderer {
             return true;
         }
         catch (Exception ex) {
-            _lastSixelError = ex.Message;
+            SetLastSixelError(ex.Message);
         }
 
         return false;
@@ -271,13 +284,17 @@ public static class ImageRenderer {
     /// Gets debug information about the last image processing error.
     /// </summary>
     /// <returns>The last error message, if any</returns>
-    public static string? GetLastImageError() => _lastImageError;
+    public static string? GetLastImageError() => s_lastImageError.Value;
 
     /// <summary>
     /// Gets debug information about the last Sixel error.
     /// </summary>
     /// <returns>The last error message, if any</returns>
-    public static string? GetLastSixelError() => _lastSixelError;
+    public static string? GetLastSixelError() => s_lastSixelError.Value;
+
+    private static void SetLastImageError(string? message) => s_lastImageError.Value = message;
+
+    private static void SetLastSixelError(string? message) => s_lastSixelError.Value = message;
 
     /// <summary>
     /// Checks if SixelImage type is available in the current environment.

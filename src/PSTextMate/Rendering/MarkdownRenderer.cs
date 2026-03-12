@@ -6,7 +6,7 @@ namespace PSTextMate.Rendering;
 /// </summary>
 internal static class MarkdownRenderer {
     /// <summary>
-    /// Cached Markdig pipeline with trivia tracking enabled.
+    /// Cached Markdig pipeline configured for markdown features used by this renderer.
     /// Pipelines are expensive to create, so we cache it as a static field for reuse.
     /// Thread-safe: Markdig pipelines are immutable once built.
     /// </summary>
@@ -37,13 +37,12 @@ internal static class MarkdownRenderer {
                 }
             }
 
-            // Calculate blank lines from source line numbers
-            // This is more reliable than trivia since extensions break trivia tracking
+            // Calculate blank lines from source line numbers to preserve visible spacing.
             if (previousBlock is not null) {
                 int previousEndLine = GetBlockEndLine(previousBlock, markdown);
                 int gap = block.Line - previousEndLine - 1;
                 for (int j = 0; j < gap; j++) {
-                    rows.Add(new Rows(Text.Empty));
+                    rows.Add(Text.Empty);
                 }
             }
 
@@ -80,18 +79,18 @@ internal static class MarkdownRenderer {
     }
 
     /// <summary>
-    /// Creates the Markdig pipeline with all necessary extensions and trivia tracking enabled.
+    /// Creates the Markdig pipeline with extensions used by the renderer.
     /// Pipeline follows Markdig's roundtrip parser design pattern - see:
     /// https://github.com/xoofx/markdig/blob/master/src/Markdig/Roundtrip.md
     /// </summary>
-    /// <returns>Configured MarkdownPipeline with trivia tracking enabled</returns>
+    /// <returns>Configured MarkdownPipeline</returns>
     private static MarkdownPipeline CreateMarkdownPipeline() {
         return new MarkdownPipelineBuilder()
-            .UseAdvancedExtensions()
+            // Keep parser behavior close to GitHub Flavored Markdown expectations.
+            .UseEmphasisExtras()
             .UseTaskLists()
             .UsePipeTables()
             .UseAutoLinks()
-            .EnableTrackTrivia()
             .Build();
     }
 }

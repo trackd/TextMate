@@ -28,7 +28,7 @@ internal static class ListRenderer {
             string prefixText = CreateListPrefixText(list.IsOrdered, isTaskList, isChecked, ref number);
             itemParagraph.Append(prefixText, Style.Plain);
 
-            List<IRenderable> nestedRenderables = AppendListItemContent(itemParagraph, item, theme);
+            List<IRenderable> nestedRenderables = AppendListItemContent(itemParagraph, item, theme, indentLevel: 0);
 
             renderables.Add(itemParagraph);
             if (nestedRenderables.Count > 0) {
@@ -65,7 +65,7 @@ internal static class ListRenderer {
     /// Appends list item content directly to the paragraph using styled Text objects.
     /// This eliminates the need for markup parsing and VT escaping.
     /// </summary>
-    private static List<IRenderable> AppendListItemContent(Paragraph paragraph, ListItemBlock item, Theme theme) {
+    private static List<IRenderable> AppendListItemContent(Paragraph paragraph, ListItemBlock item, Theme theme, int indentLevel) {
         var nestedRenderables = new List<IRenderable>();
 
         foreach (Block subBlock in item) {
@@ -80,12 +80,7 @@ internal static class ListRenderer {
                     break;
 
                 case ListBlock nestedList:
-                    string nestedContent = RenderNestedListAsText(nestedList, theme, 1);
-                    if (!string.IsNullOrEmpty(nestedContent)) {
-                        var nestedParagraph = new Paragraph();
-                        nestedParagraph.Append(nestedContent, Style.Plain);
-                        nestedRenderables.Add(nestedParagraph);
-                    }
+                    nestedRenderables.AddRange(RenderNestedList(nestedList, theme, indentLevel + 1));
                     break;
                 default:
                     break;
@@ -101,10 +96,10 @@ internal static class ListRenderer {
     private static void AppendInlineContent(Paragraph paragraph, ContainerInline? inlines, Theme theme) {
         if (inlines is null) return;
 
-        foreach (Inline inline in new List<Inline>(inlines)) {
+        foreach (Inline inline in inlines) {
             switch (inline) {
                 case LiteralInline literal:
-                    string literalText = literal.Content.ToString();
+                    string literalText = ExtractLiteralText(literal.Content);
                     if (!string.IsNullOrEmpty(literalText)) {
                         paragraph.Append(literalText, Style.Plain);
                     }
@@ -134,6 +129,9 @@ internal static class ListRenderer {
         }
     }
 
+    private static string ExtractLiteralText(StringSlice slice)
+        => slice.Text is null || slice.Length <= 0 ? string.Empty : new string(slice.Text.AsSpan(slice.Start, slice.Length));
+
     /// <summary>
     /// Extracts plain text from inline elements without markup.
     /// </summary>
@@ -151,72 +149,28 @@ internal static class ListRenderer {
 
 
     /// <summary>
-    /// Renders nested lists as indented text content.
+    /// Renders nested lists as indented renderables while preserving link styling.
     /// </summary>
-    private static string RenderNestedListAsText(ListBlock list, Theme theme, int indentLevel) {
-        StringBuilder builder = StringBuilderPool.Rent();
-        try {
-            string indent = new(' ', indentLevel * 4);
-            int number = 1;
-            bool isFirstItem = true;
+    private static List<IRenderable> RenderNestedList(ListBlock list, Theme theme, int indentLevel) {
+        var renderables = new List<IRenderable>();
+        int number = 1;
+        string indent = new(' ', indentLevel * 4);
 
-            foreach (ListItemBlock item in list.Cast<ListItemBlock>()) {
-                if (!isFirstItem) {
-                    builder.Append('\n');
-                }
+        foreach (ListItemBlock item in list.Cast<ListItemBlock>()) {
+            var itemParagraph = new Paragraph();
+            itemParagraph.Append(indent, Style.Plain);
 
-                builder.Append(indent);
+            (bool isTaskList, bool isChecked) = DetectTaskListItem(item);
+            string prefixText = CreateListPrefixText(list.IsOrdered, isTaskList, isChecked, ref number);
+            itemParagraph.Append(prefixText, Style.Plain);
 
-                (bool isTaskList, bool isChecked) = DetectTaskListItem(item);
-
-                if (isTaskList) {
-                    builder.Append(isChecked ? TaskCheckedEmoji : TaskUncheckedEmoji);
-                }
-                else if (list.IsOrdered) {
-                    builder.Append(CultureInfo.InvariantCulture, $"{number++}. ");
-                }
-                else {
-                    builder.Append(UnorderedBullet);
-                }
-
-                // Extract item text without complex inline processing for nested items
-                string itemText = ExtractListItemTextSimple(item);
-                builder.Append(itemText.Trim());
-
-                isFirstItem = false;
+            List<IRenderable> deeperRenderables = AppendListItemContent(itemParagraph, item, theme, indentLevel);
+            renderables.Add(itemParagraph);
+            if (deeperRenderables.Count > 0) {
+                renderables.AddRange(deeperRenderables);
             }
+        }
 
-            return builder.ToString();
-        }
-        finally {
-            StringBuilderPool.Return(builder);
-        }
-    }
-
-    /// <summary>
-    /// Simple text extraction for nested list items.
-    /// </summary>
-    private static string ExtractListItemTextSimple(ListItemBlock item) {
-        StringBuilder builder = StringBuilderPool.Rent();
-        try {
-            foreach (Block subBlock in item) {
-                if (subBlock is ParagraphBlock subPara && subPara.Inline is not null) {
-                    foreach (Inline inline in subPara.Inline) {
-                        if (inline is not TaskList) {
-                            // Skip TaskList markers
-                            builder.Append(ExtractInlineText(inline));
-                        }
-                    }
-                }
-                else if (subBlock is CodeBlock subCode) {
-                    builder.Append(subCode.Lines.ToString());
-                }
-            }
-
-            return builder.ToString();
-        }
-        finally {
-            StringBuilderPool.Return(builder);
-        }
+        return renderables;
     }
 }

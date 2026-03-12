@@ -28,19 +28,21 @@ internal static class CodeBlockRenderer {
                         .Header(language, Justify.Left);
                 }
             }
-            catch {
-                // Fallback to plain rendering
+            catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException) {
+                // Highlighter failures should not fail markdown rendering.
             }
         }
 
         // Fallback: create Text object directly instead of markup strings
         return CreateCodePanel(codeLines, language, theme);
-    }    /// <summary>
-         /// Renders an indented code block with proper whitespace handling.
-         /// </summary>
-         /// <param name="code">The code block to render</param>
-         /// <param name="theme">Theme for styling</param>
-         /// <returns>Rendered code block in a panel</returns>
+    }
+
+    /// <summary>
+    /// Renders an indented code block with proper whitespace handling.
+    /// </summary>
+    /// <param name="code">The code block to render</param>
+    /// <param name="theme">Theme for styling</param>
+    /// <returns>Rendered code block in a panel</returns>
     public static IRenderable RenderCodeBlock(CodeBlock code, Theme theme) {
         string[] codeLines = ExtractCodeLinesFromStringLineGroup(code.Lines);
         return CreateCodePanel(codeLines, "code", theme);
@@ -65,7 +67,11 @@ internal static class CodeBlockRenderer {
 
                 codeLines.Add(lineText);
             }
-            catch {
+            catch (InvalidOperationException) {
+                // If any error occurs, just use empty line
+                codeLines.Add(string.Empty);
+            }
+            catch (IOException) {
                 // If any error occurs, just use empty line
                 codeLines.Add(string.Empty);
             }

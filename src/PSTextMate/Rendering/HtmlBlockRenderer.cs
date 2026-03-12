@@ -28,8 +28,8 @@ internal static partial class HtmlBlockRenderer {
                     .Header("html", Justify.Left);
             }
         }
-        catch {
-            // Fallback to plain rendering
+        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException) {
+            // Highlighter failures should not fail markdown rendering.
         }
 
         // Fallback: plain HTML panel
@@ -80,8 +80,7 @@ internal static partial class HtmlBlockRenderer {
     }
 
     private static string? ExtractAttribute(string attributes, string attributeName) {
-        MatchCollection matches = HtmlAttributeRegex().Matches(attributes);
-        foreach (Match match in matches) {
+        foreach (Match match in HtmlAttributeRegex().Matches(attributes)) {
             string name = match.Groups["name"].Value;
             if (string.Equals(name, attributeName, StringComparison.OrdinalIgnoreCase)) {
                 return match.Groups["value"].Value;

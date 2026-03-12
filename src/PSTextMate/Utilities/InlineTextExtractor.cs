@@ -13,7 +13,7 @@ internal static class InlineTextExtractor {
     public static void ExtractText(Inline inline, StringBuilder builder) {
         switch (inline) {
             case LiteralInline literal:
-                builder.Append(literal.Content.ToString());
+                AppendStringSlice(literal.Content, builder);
                 break;
 
             case ContainerInline container:
@@ -29,6 +29,14 @@ internal static class InlineTextExtractor {
             default:
                 break;
         }
+    }
+
+    private static void AppendStringSlice(StringSlice slice, StringBuilder builder) {
+        if (slice.Text is null || slice.Length <= 0) {
+            return;
+        }
+
+        builder.Append(slice.Text.AsSpan(slice.Start, slice.Length));
     }
 
     /// <summary>

@@ -6,7 +6,7 @@ namespace PSTextMate.Sixel;
 /// <remarks>
 /// Initializes a new instance of the <see cref="PixelImage"/> class.
 /// </remarks>
-internal sealed class PixelImage : Renderable {
+internal sealed class PixelImage : IRenderable {
     private const char ESC = '\u001b';
     /// <summary>
     /// Gets the image width in pixels.
@@ -61,7 +61,7 @@ internal sealed class PixelImage : Renderable {
     }
 
     /// <inheritdoc/>
-    protected override Measurement Measure(RenderOptions options, int maxWidth) {
+    public Measurement Measure(RenderOptions options, int maxWidth) {
         if (PixelWidth < 0) {
             throw new InvalidOperationException("Pixel width must be greater than zero.");
         }
@@ -71,7 +71,7 @@ internal sealed class PixelImage : Renderable {
     }
 
     /// <inheritdoc/>
-    protected override IEnumerable<Segment> Render(RenderOptions options, int maxWidth) {
+    public IEnumerable<Segment> Render(RenderOptions options, int maxWidth) {
         // Got a max width smaller than the render max width?
         // When MaxWidth is explicitly set by the user, use it and don't constrain height.
         // When MaxWidth is not set, constrain the image to the terminal height so tall images
@@ -104,7 +104,7 @@ internal sealed class PixelImage : Renderable {
 
         // The segment list is a transparent canvas followed by a couple of zero-width control segments for sixel data output.
         // Rendering the sixel data after the canvas allows the canvas to be truncated in a layout without destroying the layout.
-        var segments = ((IRenderable)canvas).Render(options, maxWidth).ToList();
+        var segments = canvas.Render(options, maxWidth).ToList();
 
         // Remove the final line break from the canvas so the sixel data can be rendered relative to the top left of the canvas.
         // Leaving the line break in means when this is rendered with IAlignable the cursor position after the canvas is in the wrong location.

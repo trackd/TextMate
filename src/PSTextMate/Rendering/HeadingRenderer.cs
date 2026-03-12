@@ -52,8 +52,8 @@ internal static class HeadingRenderer {
         // Apply font style decorations
         Decoration decoration = StyleHelper.GetDecoration(fontStyle);
 
-        // Apply level-specific styling as fallbacks
-        foregroundColor ??= GetDefaultHeadingColor(level);
+        // Keep fallback neutral to better match GitHub-style heading rendering.
+        foregroundColor ??= Color.Default;
 
         // Ensure headings are bold by default
         if (decoration == Decoration.None) {
@@ -63,18 +63,4 @@ internal static class HeadingRenderer {
         return new Style(foregroundColor ?? Color.Default, backgroundColor ?? Color.Default, decoration);
     }
 
-    /// <summary>
-    /// Gets default colors for heading levels when theme doesn't provide them.
-    /// </summary>
-    private static Color GetDefaultHeadingColor(int level) {
-        return level switch {
-            1 => Color.Red,
-            2 => Color.Orange1,
-            3 => Color.Yellow,
-            4 => Color.Green,
-            5 => Color.Blue,
-            6 => Color.Purple,
-            _ => Color.White
-        };
-    }
 }

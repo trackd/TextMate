@@ -119,19 +119,21 @@ internal static class TableRenderer {
     /// </summary>
     private static string ExtractCellText(TCell cell, Theme theme) {
         StringBuilder textBuilder = StringBuilderPool.Rent();
+        try {
+            foreach (Block block in cell) {
+                if (block is ParagraphBlock paragraph && paragraph.Inline is not null) {
+                    ExtractInlineText(paragraph.Inline, textBuilder);
+                }
+                else if (block is CodeBlock code) {
+                    textBuilder.Append(code.Lines.ToString());
+                }
+            }
 
-        foreach (Block block in cell) {
-            if (block is ParagraphBlock paragraph && paragraph.Inline is not null) {
-                ExtractInlineText(paragraph.Inline, textBuilder);
-            }
-            else if (block is CodeBlock code) {
-                textBuilder.Append(code.Lines.ToString());
-            }
+            return textBuilder.ToString().Trim();
         }
-
-        string result = textBuilder.ToString().Trim();
-        StringBuilderPool.Return(textBuilder);
-        return result;
+        finally {
+            StringBuilderPool.Return(textBuilder);
+        }
     }
 
     /// <summary>
@@ -177,18 +179,6 @@ internal static class TableRenderer {
         string[] borderScopes = ["punctuation.definition.table"];
         Style? style = TokenProcessor.GetStyleForScopes(borderScopes, theme);
         return style ?? new Style(foreground: Color.Grey);
-    }
-
-    /// <summary>
-    /// Gets the header style for table headers.
-    /// </summary>
-    private static Style GetHeaderStyle(Theme theme) {
-        string[] headerScopes = ["markup.heading.table"];
-        Style? baseStyle = TokenProcessor.GetStyleForScopes(headerScopes, theme);
-        Color fgColor = baseStyle?.Foreground ?? Color.Yellow;
-        Color? bgColor = baseStyle?.Background;
-        Decoration decoration = (baseStyle?.Decoration ?? Decoration.None) | Decoration.Bold;
-        return new Style(fgColor, bgColor, decoration);
     }
 
     /// <summary>

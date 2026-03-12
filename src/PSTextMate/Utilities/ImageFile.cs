@@ -144,9 +144,8 @@ internal static partial class ImageFile {
         }
     }
 
-    private static void ScheduleTempFileCleanup(string tempFileName) {
-        _ = DeleteTempFileLaterAsync(tempFileName);
-    }
+    private static void ScheduleTempFileCleanup(string tempFileName)
+        => _ = DeleteTempFileLaterAsync(tempFileName);
 
     private static async Task DeleteTempFileLaterAsync(string tempFileName) {
         try {

@@ -16,23 +16,40 @@ internal static class MarkdownPatterns {
             return false;
         }
 
-        // Check if the paragraph contains only one LinkInline with IsImage = true
-        var inlines = paragraph.Inline.ToList();
+        int significantCount = 0;
+        LinkInline? candidate = null;
 
-        // Single image case
-        if (inlines.Count == 1 && inlines[0] is LinkInline link && link.IsImage) {
+        foreach (Inline inline in paragraph.Inline) {
+            if (inline is LineBreakInline) {
+                continue;
+            }
+
+            if (inline is LiteralInline literal && IsWhitespaceLiteral(literal.Content)) {
+                continue;
+            }
+
+            significantCount++;
+            if (significantCount > 1) {
+                return false;
+            }
+
+            candidate = inline as LinkInline;
+        }
+
+        return significantCount == 1 && candidate is { IsImage: true };
+    }
+
+    private static bool IsWhitespaceLiteral(StringSlice slice) {
+        if (slice.Text is null || slice.Length <= 0) {
             return true;
         }
 
-        // Sometimes there might be whitespace inlines around the image
-        // Filter out empty/whitespace literals
-        var nonWhitespace = inlines
-            .Where(i => i is not LineBreakInline &&
-                    !(i is LiteralInline lit && string.IsNullOrWhiteSpace(lit.Content.ToString())))
-            .ToList();
+        foreach (char c in slice.Text.AsSpan(slice.Start, slice.Length)) {
+            if (!char.IsWhiteSpace(c)) {
+                return false;
+            }
+        }
 
-        return nonWhitespace.Count == 1
-                && nonWhitespace[0] is LinkInline imageLink
-                && imageLink.IsImage;
+        return true;
     }
 }

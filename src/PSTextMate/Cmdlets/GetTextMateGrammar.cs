@@ -11,5 +11,6 @@ public sealed class GetTextMateGrammarCmdlet : PSCmdlet {
     /// <summary>
     /// Finalizes processing and outputs all supported languages.
     /// </summary>
-    protected override void EndProcessing() => WriteObject(TextMateHelper.AvailableLanguages, enumerateCollection: true);
+    protected override void EndProcessing()
+        => WriteObject(TextMateHelper.AvailableLanguages, enumerateCollection: true);
 }

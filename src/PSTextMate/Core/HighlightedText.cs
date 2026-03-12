@@ -5,22 +5,51 @@ namespace PSTextMate.Core;
 /// Provides a clean, consistent output type.
 /// Implements IRenderable so it can be used directly with Spectre.Console.
 /// </summary>
-public sealed class HighlightedText : Renderable {
+public sealed class HighlightedText : IRenderable {
+    private static readonly IRenderable[] s_emptyRenderables = [];
+
+    private IRenderable[] _renderables = s_emptyRenderables;
+
+    public HighlightedText() {
+    }
+
+    public HighlightedText(
+        IRenderable[] renderables,
+        bool showLineNumbers = false,
+        string language = "",
+        bool page = false,
+        IReadOnlyList<string>? sourceLines = null
+    ) {
+        Renderables = renderables;
+        ShowLineNumbers = showLineNumbers;
+        Language = language ?? string.Empty;
+        Page = page;
+        SourceLines = sourceLines;
+    }
+
     /// <summary>
     /// The highlighted renderables ready for display.
     /// </summary>
-    public IRenderable[] Renderables { get; set; } = [];
+    public IRenderable[] Renderables {
+        get => _renderables;
+        set => _renderables = value ?? s_emptyRenderables;
+    }
 
     // Optional view into an external renderable sequence to avoid allocating
     // new arrays when rendering paged slices. When _viewSource is non-null,
     // rendering methods use the view (Skip/Take) rather than the `Renderables` array.
     private IEnumerable<IRenderable>? _viewSource;
+    private IReadOnlyList<IRenderable>? _viewSourceList;
     private int _viewStart;
     private int _viewCount;
     // When a view is active, keep the total document line count when available
     // so line-number gutter width can be computed against the full document
     // (prevents gutter from changing across pages).
     private int _documentLineCount = -1;
+
+    // Optional source text retained for pager search fast path.
+    // This is intentionally opt-in to avoid unnecessary memory usage when paging is not used.
+    internal IReadOnlyList<string>? SourceLines { get; private set; }
 
     /// <summary>
     /// When true, prepend line numbers with a gutter separator.
@@ -54,10 +83,13 @@ public sealed class HighlightedText : Renderable {
     /// </summary>
     public void SetView(IEnumerable<IRenderable> source, int start, int count) {
         _viewSource = source ?? throw new ArgumentNullException(nameof(source));
+        _viewSourceList = source as IReadOnlyList<IRenderable>;
         _viewStart = Math.Max(0, start);
         _viewCount = Math.Max(0, count);
         // Try to capture the full source count when possible (ICollection/IReadOnlyCollection/IList)
-        _documentLineCount = source is ICollection<IRenderable> coll
+        _documentLineCount = _viewSourceList is not null
+            ? _viewSourceList.Count
+            : source is ICollection<IRenderable> coll
             ? coll.Count
             : source is IReadOnlyCollection<IRenderable> rocoll
                 ? rocoll.Count
@@ -69,20 +101,29 @@ public sealed class HighlightedText : Renderable {
     /// </summary>
     public void ClearView() {
         _viewSource = null;
+        _viewSourceList = null;
         _viewStart = 0;
         _viewCount = 0;
         _documentLineCount = -1;
     }
 
-    private IEnumerable<IRenderable> GetRenderablesEnumerable() =>
-        _viewSource is null ? Renderables : _viewSource.Skip(_viewStart).Take(_viewCount);
-    public string Language { get; set; } = string.Empty;
+    private IEnumerable<IRenderable> GetRenderablesEnumerable() {
+        return _viewSourceList is not null
+            ? EnumerateViewList(_viewSourceList, _viewStart, _viewCount)
+            : _viewSource is null ? Renderables : _viewSource.Skip(_viewStart).Take(_viewCount);
+    }
 
-    /// <summary>
-    /// When true, consumers should render this highlighted text inside a Panel.
-    /// This is preserved across slices and allows the pager to respect panel state.
-    /// </summary>
-    public bool WrapInPanel { get; set; }
+    private static IEnumerable<IRenderable> EnumerateViewList(IReadOnlyList<IRenderable> source, int start, int count) {
+        int begin = Math.Clamp(start, 0, source.Count);
+        int end = Math.Clamp(begin + Math.Max(0, count), begin, source.Count);
+        for (int i = begin; i < end; i++) {
+            yield return source[i];
+        }
+    }
+
+    internal void SetSourceLines(IReadOnlyList<string>? sourceLines)
+        => SourceLines = sourceLines;
+    public string Language { get; set; } = string.Empty;
 
     /// <summary>
     /// When true, writing this renderable should use the interactive pager.
@@ -92,23 +133,7 @@ public sealed class HighlightedText : Renderable {
     /// <summary>
     /// Renders the highlighted text by combining all renderables into a single output.
     /// </summary>
-    protected override IEnumerable<Segment> Render(RenderOptions options, int maxWidth) {
-        // If a panel wrapper is requested, render the inner content via a dedicated IRenderable
-        // and let Spectre.Console's Panel handle borders/padding.
-        if (WrapInPanel) {
-            // Fast path: if we don't need line numbers, wrap the raw rows directly
-            // to avoid creating the InnerContentRenderable wrapper.
-            if (!ShowLineNumbers) {
-                var rowsInner = new Rows(GetRenderablesEnumerable());
-                var panelInner = new Panel(rowsInner) { Padding = new Padding(0, 0), Expand = true };
-                return ((IRenderable)panelInner).Render(options, maxWidth);
-            }
-
-            var inner = new InnerContentRenderable(this);
-            var panel = new Panel(inner) { Padding = new Padding(0, 0), Expand = true };
-            return ((IRenderable)panel).Render(options, maxWidth);
-        }
-
+    public IEnumerable<Segment> Render(RenderOptions options, int maxWidth) {
         // Delegate to Rows which efficiently renders all renderables
         var rows = new Rows(GetRenderablesEnumerable());
         return !ShowLineNumbers ? ((IRenderable)rows).Render(options, maxWidth) : RenderWithLineNumbers(rows, options, maxWidth);
@@ -117,19 +142,7 @@ public sealed class HighlightedText : Renderable {
     /// <summary>
     /// Measures the dimensions of the highlighted text.
     /// </summary>
-    protected override Measurement Measure(RenderOptions options, int maxWidth) {
-        if (WrapInPanel) {
-            if (!ShowLineNumbers) {
-                var rowsInner = new Rows(GetRenderablesEnumerable());
-                var panelInner = new Panel(rowsInner) { Padding = new Padding(0, 0), Expand = true };
-                return ((IRenderable)panelInner).Measure(options, maxWidth);
-            }
-
-            var inner = new InnerContentRenderable(this);
-            var panel = new Panel(inner) { Padding = new Padding(0, 0), Expand = true };
-            return ((IRenderable)panel).Measure(options, maxWidth);
-        }
-
+    public Measurement Measure(RenderOptions options, int maxWidth) {
         // Delegate to Rows for measurement
         var rows = new Rows(GetRenderablesEnumerable());
         return !ShowLineNumbers ? ((IRenderable)rows).Measure(options, maxWidth) : MeasureWithLineNumbers(rows, options, maxWidth);
@@ -261,7 +274,9 @@ public sealed class HighlightedText : Renderable {
     public Panel ToPanel(string? title = null, BoxBorder? border = null) {
         // Build the panel around the actual inner content instead of `this` to avoid
         // creating nested panels when consumers already wrap the object.
-        IRenderable content = !ShowLineNumbers ? new Rows(Renderables) : new InnerContentRenderable(this);
+        IRenderable content = !ShowLineNumbers
+            ? new Rows(GetRenderablesEnumerable())
+            : new InnerContentRenderable(this);
 
         var panel = new Panel(content);
         panel.Padding(0, 0);

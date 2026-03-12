@@ -36,25 +36,12 @@ internal static partial class ParagraphRenderer {
         var paragraph = new Paragraph();
         bool addedAny = false;
 
-        List<Inline> inlineList = [.. inlines];
-
-        for (int i = 0; i < inlineList.Count; i++) {
-            Inline inline = inlineList[i];
-
-            bool isTrailingLineBreak = false;
-            if (inline is LineBreakInline && i < inlineList.Count) {
-                isTrailingLineBreak = true;
-                for (int j = i + 1; j < inlineList.Count; j++) {
-                    if (inlineList[j] is not LineBreakInline) {
-                        isTrailingLineBreak = false;
-                        break;
-                    }
-                }
-            }
+        for (Inline? inline = inlines.FirstChild; inline is not null; inline = inline.NextSibling) {
+            bool isTrailingLineBreak = inline is LineBreakInline && IsTrailingLineBreak(inline);
 
             switch (inline) {
                 case LiteralInline literal: {
-                        string literalText = literal.Content.ToString();
+                        string literalText = ExtractLiteralText(literal.Content);
                         if (!string.IsNullOrEmpty(literalText)) {
                             if (TryParseUsernameLinks(literalText, out TextSegment[]? usernameSegments)) {
                                 foreach (TextSegment segment in usernameSegments) {
@@ -85,7 +72,7 @@ internal static partial class ParagraphRenderer {
                         foreach (Inline emphInline in emphasis) {
                             switch (emphInline) {
                                 case LiteralInline lit:
-                                    paragraph.Append(lit.Content.ToString(), emphasisStyle);
+                                    paragraph.Append(ExtractLiteralText(lit.Content), emphasisStyle);
                                     addedAny = true;
                                     break;
                                 case CodeInline codeInline:
@@ -161,6 +148,19 @@ internal static partial class ParagraphRenderer {
         }
     }
 
+    private static bool IsTrailingLineBreak(Inline inline) {
+        for (Inline? next = inline.NextSibling; next is not null; next = next.NextSibling) {
+            if (next is not LineBreakInline) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static string ExtractLiteralText(StringSlice slice)
+        => slice.Text is null || slice.Length <= 0 ? string.Empty : new string(slice.Text.AsSpan(slice.Start, slice.Length));
+
     /// <summary>
     /// Process link as Text with Style including link parameter for clickability.
     /// </summary>
@@ -231,16 +231,11 @@ internal static partial class ParagraphRenderer {
     }
 
     /// <summary>
-    /// Determine decoration to use for emphasis based on delimiter count and environment fallback.
-    /// If environment variable `PSTEXTMATE_EMPHASIS_FALLBACK` == "underline" then use underline
-    /// for single-asterisk emphasis so italics are visible on terminals that do not support italic.
+    /// Determines the decoration to use for emphasis based on delimiter count.
     /// </summary>
     private static Decoration GetEmphasisDecoration(int delimiterCount) {
-        // Read once per call; environment lookups are cheap here since rendering isn't hot inner loop
-        string? fallback = Environment.GetEnvironmentVariable("PSTEXTMATE_EMPHASIS_FALLBACK");
-
         return delimiterCount switch {
-            1 => string.Equals(fallback, "underline", StringComparison.OrdinalIgnoreCase) ? Decoration.Underline : Decoration.Italic,
+            1 => Decoration.Italic,
             2 => Decoration.Bold,
             3 => Decoration.Bold | Decoration.Italic,
             _ => Decoration.None,

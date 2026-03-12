@@ -3,8 +3,8 @@ namespace PSTextMate.Terminal;
 /// <summary>
 /// Simple pager implemented with Spectre.Console Live display.
 /// Interaction keys:
-/// - Up/Down: move one renderable item
-/// - PageUp/PageDown: move by one viewport of items
+/// - Up/Down or j/k: move one renderable item
+/// - PageUp/PageDown/Space or h/l: move by one viewport of items
 /// - Home/End: go to start/end
 /// - / or Ctrl+F: prompt for search query
 /// - n / N: next / previous match
@@ -24,7 +24,6 @@ public sealed class Pager {
     private readonly HighlightedText? _sourceHighlightedText;
     private readonly int? _originalLineNumberStart;
     private readonly int? _originalLineNumberWidth;
-    private readonly bool? _originalWrapInPanel;
     private readonly int? _stableLineNumberWidth;
     private readonly int _statusColumnWidth;
     private int _top;
@@ -38,10 +37,8 @@ public sealed class Pager {
     private readonly StringBuilder _searchInputBuffer = new(64);
     private static readonly Style SearchRowTextStyle = new(Color.White, Color.Grey);
     private static readonly Style SearchMatchTextStyle = new(Color.Black, Color.Orange1);
-    private const string SearchRowStyle = "white on grey";
-    private const string SearchMatchStyle = "black on orange1";
     private const int KeyPollingIntervalMs = 50;
-
+    private const int MaxSearchQueryLength = 256;
     private bool TryReadKey(out ConsoleKeyInfo key) {
         if (_tryReadKeyOverride is not null) {
             ConsoleKeyInfo? injected = _tryReadKeyOverride();
@@ -126,16 +123,12 @@ public sealed class Pager {
         _tryReadKeyOverride = null;
         _suppressTerminalControlSequences = false;
         _sourceHighlightedText = highlightedText;
-        _originalWrapInPanel = highlightedText.WrapInPanel;
 
         int totalLines = highlightedText.LineCount;
         int lastLineNumber = highlightedText.LineNumberStart + Math.Max(0, totalLines - 1);
         _stableLineNumberWidth = highlightedText.LineNumberWidth ?? lastLineNumber.ToString(CultureInfo.InvariantCulture).Length;
         _originalLineNumberStart = highlightedText.LineNumberStart;
         _originalLineNumberWidth = highlightedText.LineNumberWidth;
-
-        // Panel rendering in pager mode causes unstable layout; disable it for the paging session.
-        highlightedText.WrapInPanel = false;
 
         _document = PagerDocument.FromHighlightedText(highlightedText);
         _renderables = _document.Renderables;
@@ -271,19 +264,23 @@ public sealed class Pager {
 
             switch (key.Key) {
                 case ConsoleKey.DownArrow:
+                case ConsoleKey.J:
                     ScrollRenderable(1, contentRows);
                     forceRedraw = true;
                     break;
                 case ConsoleKey.UpArrow:
+                case ConsoleKey.K:
                     ScrollRenderable(-1, contentRows);
                     forceRedraw = true;
                     break;
                 case ConsoleKey.Spacebar:
                 case ConsoleKey.PageDown:
+                case ConsoleKey.L:
                     PageDown(contentRows);
                     forceRedraw = true;
                     break;
                 case ConsoleKey.PageUp:
+                case ConsoleKey.H:
                     PageUp(contentRows);
                     forceRedraw = true;
                     break;
@@ -371,12 +368,18 @@ public sealed class Pager {
         }
 
         if (!char.IsControl(key.KeyChar)) {
-            _searchInputBuffer.Append(key.KeyChar);
-            forceRedraw = true;
+            if (_searchInputBuffer.Length < MaxSearchQueryLength) {
+                _searchInputBuffer.Append(key.KeyChar);
+                forceRedraw = true;
+            }
         }
     }
 
     private void ApplySearchQuery(string query) {
+        if (query.Length > MaxSearchQueryLength) {
+            query = query[..MaxSearchQueryLength];
+        }
+
         _search.SetQuery(query);
         if (!_search.HasQuery) {
             _searchStatusText = string.Empty;
@@ -490,8 +493,8 @@ public sealed class Pager {
         var helpRows = new Rows(
             new Text("Keybindings", new Style(Color.White, decoration: Decoration.Bold)),
             Text.Empty,
-            new Text("  Up/Down       Move one item", new Style(Color.Grey)),
-            new Text("  PgUp/PgDn     Page navigation", new Style(Color.Grey)),
+            new Text("  Up/Down or j/k Move one item", new Style(Color.Grey)),
+            new Text("  PgUp/PgDn/h/l Page navigation", new Style(Color.Grey)),
             new Text("  Home/End      Jump to start/end", new Style(Color.Grey)),
             new Text("  / or Ctrl+F   Search", new Style(Color.Grey)),
             new Text("  n / N         Next / previous match", new Style(Color.Grey)),
@@ -504,7 +507,7 @@ public sealed class Pager {
 
         return new Panel(new Align(helpRows, HorizontalAlignment.Left, VerticalAlignment.Middle)) {
             Header = new PanelHeader("Pager Help", Justify.Left),
-            Border = BoxBorder.Double,
+            Border = BoxBorder.Rounded,
             Padding = new Padding(2, 1, 2, 1),
             Expand = true
         };
@@ -545,22 +548,6 @@ public sealed class Pager {
     private IRenderable ApplySearchHighlight(int renderableIndex, IRenderable renderable) {
         IReadOnlyList<PagerSearchHit> hits = _search.GetHitsForRenderable(renderableIndex);
 
-        bool isStructuredRenderable = PagerHighlighting.IsStructuredRowHighlightCandidate(renderable);
-
-        // Keep table-specific highlighting in the structured path so row styling
-        // is scoped to matching rows rather than the whole rendered table block.
-        if ((isStructuredRenderable || hits.Count == 0)
-            && PagerHighlighting.TryBuildStructuredHighlightRenderable(
-                renderable,
-                _search.Query,
-                SearchRowStyle,
-                SearchMatchStyle,
-                hits,
-                out IRenderable structuredHighlight
-            )) {
-            return structuredHighlight;
-        }
-
         string plainText = GetSearchTextForHighlight(renderableIndex, renderable);
         if (plainText.Length == 0 || !_search.HasQuery) {
             return renderable;
@@ -573,7 +560,14 @@ public sealed class Pager {
             }
         }
 
-        return PagerHighlighting.BuildSegmentHighlightRenderable(renderable, _search.Query, SearchRowTextStyle, SearchMatchTextStyle);
+        bool highlightLinkedLabelsOnNoDirectMatch = hits.Count > 0;
+        return PagerHighlighting.BuildSegmentHighlightRenderable(
+            renderable,
+            _search.Query,
+            SearchRowTextStyle,
+            SearchMatchTextStyle,
+            highlightLinkedLabelsOnNoDirectMatch
+        );
     }
 
     private static List<PagerSearchHit> BuildQueryHits(string plainText, string query, int renderableIndex) {
@@ -774,7 +768,6 @@ public sealed class Pager {
                 _sourceHighlightedText.ClearView();
                 _sourceHighlightedText.LineNumberStart = _originalLineNumberStart ?? 1;
                 _sourceHighlightedText.LineNumberWidth = _originalLineNumberWidth;
-                _sourceHighlightedText.WrapInPanel = _originalWrapInPanel ?? false;
             }
 
             if (!_suppressTerminalControlSequences) {

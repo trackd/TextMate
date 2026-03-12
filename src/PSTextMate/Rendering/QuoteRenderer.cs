@@ -36,7 +36,7 @@ internal static class QuoteRenderer {
         };
 
         return new Panel(content)
-            .Border(BoxBorder.Heavy)
+            .Border(BoxBorder.Rounded)
             .Header("quote", Justify.Left);
     }
 }

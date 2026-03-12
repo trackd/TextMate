@@ -12,22 +12,36 @@ internal sealed record PagerDocumentEntry(
     public int[] LineStarts => GetLineStarts();
 }
 
-internal sealed class PagerDocument {
+internal sealed partial class PagerDocument {
     private readonly List<PagerDocumentEntry> _entries = [];
+    private static readonly Regex s_hyperlinkTargetRegex = HyperlinkTargetRegex();
 
     public IReadOnlyList<PagerDocumentEntry> Entries => _entries;
 
-    public IReadOnlyList<IRenderable> Renderables { get; }
+    public IReadOnlyList<IRenderable> Renderables { get; private set; } = [];
 
     public PagerDocument(IEnumerable<IRenderable> renderables) {
+        Initialize(renderables, sourceLines: null);
+    }
+
+    private PagerDocument(IEnumerable<IRenderable> renderables, IReadOnlyList<string>? sourceLines) {
+        Initialize(renderables, sourceLines);
+    }
+
+    private void Initialize(IEnumerable<IRenderable> renderables, IReadOnlyList<string>? sourceLines) {
         ArgumentNullException.ThrowIfNull(renderables);
 
         var renderableList = new List<IRenderable>();
         int index = 0;
         foreach (IRenderable renderable in renderables) {
+            int entryIndex = index;
             bool isImage = IsImageRenderable(renderable);
             Lazy<string> lazySearchText = new(
-                () => isImage ? string.Empty : ExtractSearchText(renderable),
+                () => isImage
+                    ? string.Empty
+                    : sourceLines is not null
+                    ? Normalize(sourceLines[entryIndex])
+                    : ExtractSearchText(renderable),
                 isThreadSafe: false
             );
             Lazy<int[]> lazyLineStarts = new(
@@ -51,7 +65,11 @@ internal sealed class PagerDocument {
 
     public static PagerDocument FromHighlightedText(HighlightedText highlightedText) {
         ArgumentNullException.ThrowIfNull(highlightedText);
-        return new PagerDocument(highlightedText.Renderables);
+
+        IReadOnlyList<string>? sourceLines = highlightedText.SourceLines;
+        return sourceLines is not null && sourceLines.Count == highlightedText.Renderables.Length
+            ? new PagerDocument(highlightedText.Renderables, sourceLines)
+            : new PagerDocument(highlightedText.Renderables);
     }
 
     public PagerDocumentEntry? GetEntry(int renderableIndex) {
@@ -61,15 +79,17 @@ internal sealed class PagerDocument {
     }
 
     private static string ExtractSearchText(IRenderable renderable) {
-        if (renderable is Text text) {
-            return Normalize(text.ToString());
-        }
-
         try {
             string rendered = Writer.WriteToString(renderable, width: 200);
-            string normalized = Normalize(VTHelpers.StripAnsi(rendered));
-            return !string.IsNullOrEmpty(normalized)
-                ? normalized
+            string visibleText = Normalize(VTHelpers.StripAnsi(rendered));
+            string hyperlinkTargets = ExtractHyperlinkTargets(rendered);
+
+            return !string.IsNullOrEmpty(hyperlinkTargets)
+                ? string.IsNullOrEmpty(visibleText)
+                    ? hyperlinkTargets
+                    : $"{visibleText}\n{hyperlinkTargets}"
+                : !string.IsNullOrEmpty(visibleText)
+                ? visibleText
                 : Normalize(renderable.ToString());
         }
         catch (InvalidOperationException) {
@@ -78,7 +98,37 @@ internal sealed class PagerDocument {
         catch (IOException) {
             return Normalize(renderable.ToString());
         }
+        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException) {
+            return Normalize(renderable.ToString());
+        }
     }
+
+    private static string ExtractHyperlinkTargets(string rendered) {
+        if (string.IsNullOrEmpty(rendered)) {
+            return string.Empty;
+        }
+
+        var urls = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (Match match in s_hyperlinkTargetRegex.Matches(rendered)) {
+            string url = match.Groups["url"].Value;
+            if (string.IsNullOrWhiteSpace(url)) {
+                continue;
+            }
+
+            if (seen.Add(url)) {
+                urls.Add(url);
+            }
+        }
+
+        return urls.Count == 0
+            ? string.Empty
+            : Normalize(string.Join('\n', urls));
+    }
+
+    [GeneratedRegex("\\x1b\\]8;;(?<url>.*?)(?:\\x1b\\\\|\\x07)", RegexOptions.NonBacktracking, 250)]
+    private static partial Regex HyperlinkTargetRegex();
 
     private static string Normalize(string? value) {
         return string.IsNullOrEmpty(value)

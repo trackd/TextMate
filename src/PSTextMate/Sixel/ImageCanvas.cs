@@ -3,7 +3,7 @@ namespace PSTextMate.Sixel;
 /// <summary>
 /// Represents a renderable canvas.
 /// </summary>
-internal sealed class ImageCanvas : Renderable {
+internal sealed class ImageCanvas : IRenderable {
     private struct Cell {
         public char Glyph;
         public Color? Foreground;
@@ -95,7 +95,7 @@ internal sealed class ImageCanvas : Renderable {
     }
 
     /// <inheritdoc/>
-    protected override Measurement Measure(RenderOptions options, int maxWidth) {
+    public Measurement Measure(RenderOptions options, int maxWidth) {
         if (PixelWidth < 0) {
             throw new InvalidOperationException("Pixel width must be greater than zero.");
         }
@@ -106,7 +106,7 @@ internal sealed class ImageCanvas : Renderable {
     }
 
     /// <inheritdoc/>
-    protected override IEnumerable<Segment> Render(RenderOptions options, int maxWidth) {
+    public IEnumerable<Segment> Render(RenderOptions options, int maxWidth) {
         if (PixelWidth < 0) {
             throw new InvalidOperationException("Pixel width must be greater than zero.");
         }
