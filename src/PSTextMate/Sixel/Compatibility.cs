@@ -34,8 +34,9 @@ public static partial class Compatibility {
         const int maxRetries = 2;
 
         lock (s_controlSequenceLock) {
-            // Drain any stale bytes that may have leaked from prior VT interactions.
-            DrainPendingInput();
+            if (HasPendingInput()) {
+                return string.Empty;
+            }
 
             for (int retry = 0; retry < maxRetries; retry++) {
                 try {
@@ -87,6 +88,19 @@ public static partial class Compatibility {
         }
 
         return string.Empty;
+    }
+
+    private static bool HasPendingInput() {
+        if (Console.IsOutputRedirected || Console.IsInputRedirected) {
+            return false;
+        }
+
+        try {
+            return Console.KeyAvailable;
+        }
+        catch {
+            return false;
+        }
     }
 
     /// <summary>

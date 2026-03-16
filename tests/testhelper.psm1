@@ -29,8 +29,8 @@ function Get-HostBuffer {
     $windowRect = [System.Management.Automation.Host.Rectangle]::new(
         $windowPosition.X,
         $windowPosition.Y,
-        ($windowPosition.X + $windowWidth),
-        ($windowPosition.Y + $windowHeight))
+        ($windowPosition.X + $windowWidth - 1),
+        ($windowPosition.Y + $windowHeight - 1))
     $windowBuffer = $host.UI.RawUI.GetBufferContents($windowRect)
     foreach ($x in 0..($windowHeight - 1)) {
         $row = foreach ($y in 0..($windowWidth - 1)) {

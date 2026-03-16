@@ -18,16 +18,18 @@ public static class SpectreRenderBridge {
     public static string RenderToString(object renderableObject, bool escapeAnsi = false, int? width = null) {
         ArgumentNullException.ThrowIfNull(renderableObject);
 
-        string rendered = renderableObject is IRenderable localRenderable
-            ? RenderLocal(localRenderable, width)
-            : RenderForeign(renderableObject, width);
-
-        return rendered.Length != 0
-            ? escapeAnsi ? VTHelpers.StripAnsi(rendered) : rendered
-            : throw new ArgumentException(
+        string rendered;
+        if (renderableObject is IRenderable localRenderable) {
+            rendered = RenderLocal(localRenderable, width);
+        }
+        else if (!TryRenderForeign(renderableObject, width, out rendered)) {
+            throw new ArgumentException(
                 $"Object of type '{renderableObject.GetType().FullName}' does not implement a supported Spectre IRenderable shape.",
                 nameof(renderableObject)
             );
+        }
+
+        return escapeAnsi ? VTHelpers.StripAnsi(rendered) : rendered;
     }
 
     /// <summary>
@@ -87,7 +89,8 @@ public static class SpectreRenderBridge {
         return writer.ToString();
     }
 
-    private static string RenderForeign(object renderableObject, int? width) {
+    private static bool TryRenderForeign(object renderableObject, int? width, out string rendered) {
+        rendered = string.Empty;
         Type valueType = renderableObject.GetType();
         Assembly assembly = valueType.Assembly;
 
@@ -101,7 +104,7 @@ public static class SpectreRenderBridge {
             || ansiConsoleSettingsType is null
             || ansiConsoleOutputType is null
             || foreignRenderableType?.IsInstanceOfType(renderableObject) != true) {
-            return string.Empty;
+            return false;
         }
 
         using StringWriter writer = new(new StringBuilder(1024), CultureInfo.InvariantCulture);
@@ -109,7 +112,7 @@ public static class SpectreRenderBridge {
         object? settings = Activator.CreateInstance(ansiConsoleSettingsType);
         PropertyInfo? outProperty = ansiConsoleSettingsType.GetProperty("Out");
         if (output is null || settings is null || outProperty is null || !outProperty.CanWrite) {
-            return string.Empty;
+            return false;
         }
 
         outProperty.SetValue(settings, output);
@@ -121,7 +124,7 @@ public static class SpectreRenderBridge {
                 && parameters[0].ParameterType == ansiConsoleSettingsType);
         object? console = createMethod?.Invoke(null, [settings]);
         if (console is null) {
-            return string.Empty;
+            return false;
         }
 
         if (width is int targetWidth && targetWidth > 0) {
@@ -136,7 +139,8 @@ public static class SpectreRenderBridge {
         MethodInfo? writeMethod = console.GetType().GetMethod("Write", [foreignRenderableType]);
         if (writeMethod is not null) {
             _ = writeMethod.Invoke(console, [renderableObject]);
-            return writer.ToString();
+            rendered = writer.ToString();
+            return true;
         }
 
         Type? extType = assembly.GetType("Spectre.Console.AnsiConsoleExtensions");
@@ -146,11 +150,12 @@ public static class SpectreRenderBridge {
                 && method.GetParameters() is { Length: 2 } parameters
                 && parameters[1].ParameterType == foreignRenderableType);
         if (extWriteMethod is null) {
-            return string.Empty;
+            return false;
         }
 
         _ = extWriteMethod.Invoke(null, [console, renderableObject]);
-        return writer.ToString();
+        rendered = writer.ToString();
+        return true;
     }
 
     private static CallSite<Func<CallSite, object, IRenderable>> CreateConvertToRenderableCallSite() {

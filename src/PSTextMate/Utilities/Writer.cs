@@ -32,13 +32,13 @@ public static class Writer {
     /// Renders highlighted text to string.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static string? Write(HighlightedText highlightedText, bool autoPage = false, bool FromFormat = false) {
+    public static string? Write(HighlightedText highlightedText, bool autoPage = false, bool fromFormat = false) {
         ArgumentNullException.ThrowIfNull(highlightedText);
 
         if (highlightedText.Page || (autoPage && ShouldPage(highlightedText))) {
             var pager = new Pager(highlightedText);
             pager.Show();
-            if (FromFormat) VTHelpers.MoveCursorRowUp(2);
+            if (fromFormat) VTHelpers.MoveCursorRowUp(2);
             return null;
         }
 
@@ -46,7 +46,7 @@ public static class Writer {
         // and flowing through host formatting can strip DCS wrappers and print payload text.
         if (ContainsImageRenderables(highlightedText.Renderables)) {
             AnsiConsole.Write(highlightedText);
-            if (FromFormat) VTHelpers.MoveCursorRowUp(2);
+            if (fromFormat) VTHelpers.MoveCursorRowUp(2);
             return null;
         }
 
