@@ -32,6 +32,18 @@ and displayed line-by-line.
 
 The pager supports keyboard navigation for scrolling and paging through large output.
 
+use `?` for interactive help.
+
+Navigation:
+Arrows Up/Down
+PageUp/PageDown/space
+Home/End
+h/j/k/l
+`/` or ctrl+f for search
+N for next search match
+C for clearing search
+q/ESC for exiting pager
+
 ## EXAMPLES
 
 ### Example 1
