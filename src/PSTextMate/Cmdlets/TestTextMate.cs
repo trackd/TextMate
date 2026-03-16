@@ -1,0 +1,70 @@
+
+namespace PSTextMate.Commands;
+
+/// <summary>
+/// Cmdlet for testing TextMate support for languages, extensions, and files.
+/// Provides validation functionality to check compatibility before processing.
+/// </summary>
+[OutputType(typeof(bool))]
+[Cmdlet(VerbsDiagnostic.Test, "TextMate", DefaultParameterSetName = "FileSet")]
+public sealed class TestTextMateCmdlet : PSCmdlet {
+    /// <summary>
+    /// File extension to test for support (e.g., '.ps1').
+    /// </summary>
+    [Parameter(
+        ParameterSetName = "ExtensionSet",
+        ValueFromPipelineByPropertyName = true,
+        Mandatory = true
+    )]
+    [ValidateNotNullOrEmpty]
+    public string? Extension { get; set; }
+
+    /// <summary>
+    /// Language ID to test for support (e.g., 'powershell').
+    /// </summary>
+    [Parameter(
+        ParameterSetName = "LanguageSet",
+        ValueFromPipelineByPropertyName = true,
+        Mandatory = true
+    )]
+    [ValidateNotNullOrEmpty]
+    public string? Language { get; set; }
+
+    /// <summary>
+    /// File path to test for support.
+    /// </summary>
+    [Parameter(
+        ParameterSetName = "FileSet",
+        ValueFromPipelineByPropertyName = true,
+        Mandatory = true,
+        Position = 0
+    )]
+    [Alias("Path")]
+    [ValidateNotNullOrEmpty]
+    public string? File { get; set; }
+
+    /// <summary>
+    /// Finalizes processing and outputs support check results.
+    /// </summary>
+    protected override void ProcessRecord() {
+        switch (ParameterSetName) {
+            case "FileSet":
+                FileInfo filePath = new(GetUnresolvedProviderPathFromPSPath(File!));
+                if (!filePath.Exists) {
+                    var exception = new FileNotFoundException($"File not found: {filePath.FullName}", filePath.FullName);
+                    WriteError(new ErrorRecord(exception, nameof(TestTextMateCmdlet), ErrorCategory.ObjectNotFound, filePath.FullName));
+                    return;
+                }
+                WriteObject(TextMateExtensions.IsSupportedFile(filePath.FullName));
+                break;
+            case "ExtensionSet":
+                WriteObject(TextMateExtensions.IsSupportedExtension(Extension!));
+                break;
+            case "LanguageSet":
+                WriteObject(TextMateLanguages.IsSupportedLanguage(Language!));
+                break;
+            default:
+                break;
+        }
+    }
+}

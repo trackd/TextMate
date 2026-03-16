@@ -1,13 +1,14 @@
 # TextMate
 
-TextMate delivers syntax-aware highlighting for PowerShell on top of TextMate grammars. It exposes a focused set of cmdlets that emit tokenized, theme-styled `HighlightedText` renderables you can write with PwshSpectreConsole or feed into any Spectre-based pipeline. Helper cmdlets make it easy to discover grammars and validate support for files, extensions, or language IDs before formatting.
+TextMate delivers syntax-aware highlighting for PowerShell on top of TextMate grammars. It exposes a focused set of cmdlets that emit tokenized, theme-styled `HighlightedText` renderables you can write directly or feed into any Spectre-based pipeline. Helper cmdlets make it easy to discover grammars and validate support for files, extensions, or language IDs before formatting.
 
 What it does
 
 - Highlights source text using TextMate grammars such as PowerShell, C#, Markdown, and Python.
-- Returns `HighlightedText` renderables that implement Spectre.Console's contract, so they can be written through PwshSpectreConsole or other Spectre hosts.
+- Builtin pager, either through `-Page` or piping to `Out-Page`
+- Returns `HighlightedText` renderables that implement Spectre.Console's contract, so they can be written directly or through other Spectre hosts.
 - Provides discovery and testing helpers for installed grammars, extensions, or language IDs.
-- Does inline Sixel images in markdown
+- Sixel images in markdown.
 
 ![Demo](./assets/demo.png)
 
@@ -21,9 +22,10 @@ What it does
 | [Format-PowerShell](docs/en-us/Format-PowerShell.md) | Highlight PowerShell code |
 | [Get-TextMateGrammar](docs/en-us/Get-TextMateGrammar.md) | List available grammars and file extensions. |
 | [Test-TextMate](docs/en-us/Test-TextMate.md) | Check support for a file, extension, or language ID. |
+| [Out-Page](docs/en-us/Out-Page.md) | Builtin terminal pager |
 
 ```note
-Format-CSharp/Markdown/Powershell is just sugar for Format-TextMate -Language CSharp/PowerShell/Markdown
+Format-CSharp/Markdown/Powershell is just syntactic sugar for Format-TextMate -Language CSharp/PowerShell/Markdown
 ```
 
 ## Examples
@@ -34,6 +36,9 @@ Format-CSharp/Markdown/Powershell is just sugar for Format-TextMate -Language CS
 
 # render a Markdown file with a theme
 Get-Content README.md -Raw | Format-Markdown -Theme SolarizedLight
+
+# FileInfo Object
+Get-Item .\script.ps1 | Format-TextMate
 
 # list supported grammars
 Get-SupportedTextMate
@@ -77,8 +82,7 @@ Import-Module .\output\TextMate.psd1
 
 - [TextMateSharp](https://github.com/danipen/TextMateSharp)  
   - [OnigWrap](https://github.com/aikawayataro/Onigwrap)
-- [PwshSpectreConsole](https://github.com/ShaunLawrie/PwshSpectreConsole)  
-  - [SpectreConsole](https://github.com/spectreconsole/spectre.console)  
+- [SpectreConsole](https://github.com/spectreconsole/spectre.console)  
 
 ---
 

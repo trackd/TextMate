@@ -1,0 +1,315 @@
+namespace PSTextMate.Rendering;
+
+/// <summary>
+/// Handles rendering of images in markdown using Sixel format when possible.
+/// </summary>
+public static class ImageRenderer {
+    private static readonly AsyncLocal<string?> s_lastSixelError = new();
+    private static readonly AsyncLocal<string?> s_lastImageError = new();
+    private static readonly AsyncLocal<string?> s_currentMarkdownDirectory = new();
+
+    private static readonly TimeSpan ImageTimeout = TimeSpan.FromSeconds(5); // Increased to 5 seconds
+
+    /// <summary>
+    /// The base directory for resolving relative image paths in markdown.
+    /// Set this before rendering markdown content to enable relative path resolution.
+    /// </summary>
+    public static string? CurrentMarkdownDirectory {
+        get => s_currentMarkdownDirectory.Value;
+        set => s_currentMarkdownDirectory.Value = value;
+    }
+
+    /// <summary>
+    /// Renders an image using Sixel format if possible, otherwise falls back to a link.
+    /// </summary>
+    /// <param name="altText">Alternative text for the image</param>
+    /// <param name="imageUrl">URL or path to the image</param>
+    /// <param name="maxWidth">Maximum width for the image (optional)</param>
+    /// <param name="maxHeight">Maximum height for the image (optional)</param>
+    /// <returns>A renderable representing the image or fallback</returns>
+    public static IRenderable RenderImage(string altText, string imageUrl, int? maxWidth = null, int? maxHeight = null) {
+        try {
+            // Clear previous errors
+            s_lastImageError.Value = null;
+            s_lastSixelError.Value = null;
+
+            // Check if the image format is likely supported
+            if (!ImageFile.IsLikelySupportedImageFormat(imageUrl, CurrentMarkdownDirectory)) {
+                SetLastImageError($"Unsupported image format: {imageUrl}");
+                return CreateImageFallback(altText, imageUrl);
+            }
+
+            // Use a timeout for image processing
+            if (!TryNormalizeImagePath(imageUrl, out string? localImagePath, out bool timedOut)) {
+                if (timedOut) {
+                    SetLastImageError($"Image download timeout after {ImageTimeout.TotalSeconds} seconds: {imageUrl}");
+                }
+                else if (CurrentMarkdownDirectory is not null) {
+                    SetLastImageError($"Failed to resolve '{imageUrl}' with base directory '{CurrentMarkdownDirectory}'");
+                }
+
+                // Timeout occurred
+                return CreateImageFallback(altText, imageUrl);
+            }
+
+            if (localImagePath is null) {
+                SetLastImageError($"Failed to normalize image source: {imageUrl}");
+                return CreateImageFallback(altText, imageUrl);
+            }
+
+            // Verify the downloaded file exists and has content
+            if (!File.Exists(localImagePath)) {
+                SetLastImageError($"Downloaded image file does not exist: {localImagePath}");
+                return CreateImageFallback(altText, imageUrl);
+            }
+
+            var fileInfo = new FileInfo(localImagePath);
+            if (fileInfo.Length == 0) {
+                SetLastImageError($"Downloaded image file is empty: {localImagePath} (0 bytes)");
+                return CreateImageFallback(altText, imageUrl);
+            }
+
+            // Set reasonable defaults for markdown display
+            int defaultMaxWidth = maxWidth ?? 80;  // Default to ~80 characters wide for terminal display
+            int defaultMaxHeight = maxHeight ?? 30; // Default to ~30 lines high
+
+            if (TryCreateSixelRenderable(localImagePath, defaultMaxWidth, defaultMaxHeight, out IRenderable? sixelImage) && sixelImage is not null) {
+                // Return the sixel image directly. The caller may append an explicit Text.NewLine
+                // so it renders as a separate row (avoids embedding the blank row inside the same widget).
+                return sixelImage;
+            }
+            else {
+                // Fallback to enhanced link representation with file info
+                SetLastImageError($"SixelImage creation failed. File: {localImagePath} ({fileInfo.Length} bytes). Sixel error: {s_lastSixelError.Value}");
+                return CreateEnhancedImageFallback(altText, imageUrl, localImagePath);
+            }
+        }
+        catch (InvalidOperationException ex) {
+            // If anything goes wrong, fall back to the basic link representation
+            SetLastImageError($"Exception in RenderImage: {ex.Message}");
+            return CreateImageFallback(altText, imageUrl);
+        }
+        catch (IOException ex) {
+            // If anything goes wrong, fall back to the basic link representation
+            SetLastImageError($"Exception in RenderImage: {ex.Message}");
+            return CreateImageFallback(altText, imageUrl);
+        }
+        catch (HttpRequestException ex) {
+            SetLastImageError($"Exception in RenderImage: {ex.Message}");
+            return CreateImageFallback(altText, imageUrl);
+        }
+        catch (TaskCanceledException ex) {
+            SetLastImageError($"Exception in RenderImage: {ex.Message}");
+            return CreateImageFallback(altText, imageUrl);
+        }
+    }
+
+    /// <summary>
+    /// Renders an image inline (without panel) using Sixel format if possible.
+    /// </summary>
+    /// <param name="altText">Alternative text for the image</param>
+    /// <param name="imageUrl">URL or path to the image</param>
+    /// <param name="maxWidth">Maximum width for the image (optional)</param>
+    /// <param name="maxHeight">Maximum height for the image (optional)</param>
+    /// <returns>A renderable representing the image or fallback</returns>
+    public static IRenderable RenderImageInline(string altText, string imageUrl, int? maxWidth = null, int? maxHeight = null) {
+        try {
+            // Check if the image format is likely supported
+            if (!ImageFile.IsLikelySupportedImageFormat(imageUrl, CurrentMarkdownDirectory)) {
+                return CreateImageFallbackInline(altText, imageUrl);
+            }
+
+            // Use a timeout for image processing
+            if (!TryNormalizeImagePath(imageUrl, out string? localImagePath, out bool timedOut) || timedOut) {
+                // Timeout occurred
+                return CreateImageFallbackInline(altText, imageUrl);
+            }
+
+            if (localImagePath is null) {
+                return CreateImageFallbackInline(altText, imageUrl);
+            }
+
+            // Smaller defaults for inline images
+            int width = maxWidth ?? 60;  // Default max width for inline images
+            int height = maxHeight ?? 20; // Default max height for inline images
+
+            if (TryCreateSixelRenderable(localImagePath, width, height, out IRenderable? sixelImage) && sixelImage is not null) {
+                return sixelImage;
+            }
+            // Fallback to inline link representation
+            return CreateImageFallbackInline(altText, imageUrl);
+        }
+        // If anything goes wrong, fall back to the link representation
+        catch (InvalidOperationException) {
+            return CreateImageFallbackInline(altText, imageUrl);
+        }
+        catch (HttpRequestException) {
+            return CreateImageFallbackInline(altText, imageUrl);
+        }
+        catch (IOException) {
+            return CreateImageFallbackInline(altText, imageUrl);
+        }
+        catch (TaskCanceledException) {
+            return CreateImageFallbackInline(altText, imageUrl);
+        }
+    }
+
+    /// <summary>
+    /// Attempts to create a sixel renderable using the newest available implementation.
+    /// </summary>
+    private static bool TryCreateSixelRenderable(string imagePath, int? maxWidth, int? maxHeight, out IRenderable? result)
+        => TryCreatePixelImage(imagePath, maxWidth, maxHeight, out result);
+
+    private static bool TryNormalizeImagePath(string imageUrl, out string? localImagePath, out bool timedOut) {
+        localImagePath = null;
+        timedOut = false;
+
+        try {
+            Task<string?> task = ImageFile.NormalizeImageSourceAsync(imageUrl, CurrentMarkdownDirectory);
+            localImagePath = task.WaitAsync(ImageTimeout).GetAwaiter().GetResult();
+            return true;
+        }
+        catch (TimeoutException) {
+            timedOut = true;
+            return false;
+        }
+        catch (InvalidOperationException) {
+            return false;
+        }
+        catch (HttpRequestException) {
+            return false;
+        }
+        catch (IOException) {
+            return false;
+        }
+        catch (TaskCanceledException) {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Attempts to create a local PixelImage backed by the new sixel implementation.
+    /// </summary>
+    private static bool TryCreatePixelImage(string imagePath, int? maxWidth, int? maxHeight, out IRenderable? result) {
+        result = null;
+
+        try {
+            if (!Compatibility.TerminalSupportsSixel()) {
+                SetLastSixelError("Terminal does not report Sixel support.");
+                return false;
+            }
+
+            if (!File.Exists(imagePath)) {
+                SetLastSixelError($"Image file not found: {imagePath}");
+                return false;
+            }
+
+            var pixelImage = new PixelImage(imagePath, animationDisabled: false);
+
+            if (maxWidth.HasValue) {
+                pixelImage.MaxWidth = maxWidth.Value;
+            }
+
+            // MaxHeight is handled internally by PixelImage through terminal-height based clipping
+            // when MaxWidth is not explicitly user-limited.
+            if (maxHeight.HasValue && maxHeight.Value <= 0) {
+                SetLastSixelError("MaxHeight must be greater than zero when specified.");
+                return false;
+            }
+
+            result = pixelImage;
+            return true;
+        }
+        catch (Exception ex) {
+            SetLastSixelError(ex.Message);
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Creates a fallback representation of an image as a clickable link with an icon.
+    /// </summary>
+    /// <param name="altText">Alternative text for the image</param>
+    /// <param name="imageUrl">URL or path to the image</param>
+    /// <returns>A markup string representing the image as a link</returns>
+    private static Text CreateImageFallback(string altText, string imageUrl) {
+        string linkText = $"🖼️ Image: {altText}";
+        Style style = SpectreStyleCompat.CreateWithLink(Color.Blue, null, Decoration.Underline, imageUrl);
+        return new Text(linkText, style);
+    }
+
+    /// <summary>
+    /// Creates an enhanced fallback representation with file information.
+    /// </summary>
+    /// <param name="altText">Alternative text for the image</param>
+    /// <param name="imageUrl">Original URL or path to the image</param>
+    /// <param name="localPath">Local path to the image file</param>
+    /// <returns>A panel with enhanced image information</returns>
+    private static IRenderable CreateEnhancedImageFallback(string altText, string imageUrl, string localPath) {
+        try {
+            var fileInfo = new FileInfo(localPath);
+            string? sizeText = fileInfo.Exists ? $" ({fileInfo.Length / 1024:N0} KB)" : "";
+
+            // Build a text-based content with clickable link style
+            string display = $"🖼️ {altText}{sizeText}";
+            Style linkStyle = SpectreStyleCompat.CreateWithLink(Color.Blue, null, Decoration.Underline, imageUrl);
+            var text = new Text(display, linkStyle);
+            return new Panel(text)
+                .Header("Image (Sixel not available)")
+                .Border(BoxBorder.Rounded)
+                .BorderColor(Color.Grey);
+        }
+        catch (InvalidOperationException) {
+            return CreateImageFallback(altText, imageUrl);
+        }
+        catch (IOException) {
+            return CreateImageFallback(altText, imageUrl);
+        }
+    }
+
+    /// <summary>
+    /// Creates an inline fallback representation of an image as a clickable link with an icon.
+    /// </summary>
+    /// <param name="altText">Alternative text for the image</param>
+    /// <param name="imageUrl">URL or path to the image</param>
+    /// <returns>A markup string representing the image as a link</returns>
+    private static Text CreateImageFallbackInline(string altText, string imageUrl) {
+        string display = $"🖼️ {altText}";
+        Style style = SpectreStyleCompat.CreateWithLink(Color.Blue, null, Decoration.Underline, imageUrl);
+        return new Text(display, style);
+    }
+
+    /// <summary>
+    /// Gets debug information about the last image processing error.
+    /// </summary>
+    /// <returns>The last error message, if any</returns>
+    public static string? GetLastImageError() => s_lastImageError.Value;
+
+    /// <summary>
+    /// Gets debug information about the last Sixel error.
+    /// </summary>
+    /// <returns>The last error message, if any</returns>
+    public static string? GetLastSixelError() => s_lastSixelError.Value;
+
+    private static void SetLastImageError(string? message) => s_lastImageError.Value = message;
+
+    private static void SetLastSixelError(string? message) => s_lastSixelError.Value = message;
+
+    /// <summary>
+    /// Checks if SixelImage type is available in the current environment.
+    /// </summary>
+    /// <returns>True if SixelImage can be found</returns>
+    public static bool IsSixelImageAvailable() {
+        try {
+            return Compatibility.TerminalSupportsSixel();
+        }
+        catch (InvalidOperationException) {
+            return false;
+        }
+        catch (IOException) {
+            return false;
+        }
+    }
+
+}

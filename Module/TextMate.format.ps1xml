@@ -41,5 +41,24 @@
           </TableRowEntries>
         </TableControl>
     </View>
+    <View>
+      <Name>HighlightedText</Name>
+      <ViewSelectedBy>
+        <TypeName>PSTextMate.Core.HighlightedText</TypeName>
+      </ViewSelectedBy>
+      <CustomControl>
+        <CustomEntries>
+          <CustomEntry>
+            <CustomItem>
+              <ExpressionBinding>
+                <ScriptBlock>
+                  [PSTextMate.Utilities.Writer]::Write($_, $false, $true)
+                </ScriptBlock>
+              </ExpressionBinding>
+            </CustomItem>
+          </CustomEntry>
+        </CustomEntries>
+      </CustomControl>
+    </View>
   </ViewDefinitions>
 </Configuration>

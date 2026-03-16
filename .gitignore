@@ -5,11 +5,12 @@ src/.vs/*
 Module/lib
 debug.md
 [Oo]utput/
-*/obj/*
-*/bin/*
+**/obj/**
+**/bin/**
 .github/chatmodes/*
 .github/instructions/*
 .github/prompts/*
 ref/**
 Copilot-Processing.md
 tools/**
+src/Utilities/TMConsole.cs

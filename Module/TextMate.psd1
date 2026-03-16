@@ -1,11 +1,11 @@
 @{
-    RootModule           = 'lib/PSTextMate.dll'
-    ModuleVersion        = '0.1.0'
+    RootModule           = 'TextMate.psm1'
+    ModuleVersion        = '0.2.0'
     GUID                 = 'fe78d2cb-2418-4308-9309-a0850e504cd6'
     Author               = 'trackd'
     CompanyName          = 'trackd'
     Copyright            = '(c) trackd. All rights reserved.'
-    Description          = 'A PowerShell module for syntax highlighting using TextMate grammars. Using PwshSpectreConsole for rendering.'
+    Description          = 'A PowerShell module for syntax highlighting using TextMate grammars with built-in Spectre rendering.'
     PowerShellVersion    = '7.4'
     CompatiblePSEditions = 'Core'
     CmdletsToExport      = @(
@@ -13,6 +13,7 @@
         'Format-CSharp'
         'Format-Markdown'
         'Format-PowerShell'
+        'Out-Page'
         'Test-TextMate'
         'Get-TextMateGrammar'
     )
@@ -22,12 +23,13 @@
         'fps'
         'ftm'
         'Show-TextMate'
+        'page'
     )
     FormatsToProcess     = 'TextMate.format.ps1xml'
     RequiredModules      = @(
         @{
             ModuleName     = 'PwshSpectreConsole'
-            ModuleVersion  = '2.3.0'
+            ModuleVersion  = '2.6.3'
             MaximumVersion = '2.99.99'
         }
     )

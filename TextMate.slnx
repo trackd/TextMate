@@ -1,3 +1,5 @@
 <Solution>
-  <Project Path="src/PSTextMate.csproj" />
+  <Project Path="src/PSTextMate/PSTextMate.csproj" />
+  <Project Path="src/PSTextMate.ALC/PSTextMate.ALC.csproj" />
+  <Project Path="tests/PSTextMate.InteractiveTests/PSTextMate.InteractiveTests.csproj" />
 </Solution>

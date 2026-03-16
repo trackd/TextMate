@@ -5,21 +5,22 @@ param(
     [switch]$SkipHelp,
     [switch]$SkipTests
 )
+
 Write-Host "$($PSBoundParameters.GetEnumerator())" -ForegroundColor Cyan
 
 $modulename = [System.IO.Path]::GetFileName($PSCommandPath) -replace '\.build\.ps1$'
+# $modulename = 'PSTextMate'
 
 $script:folders = @{
     ModuleName       = $modulename
     ProjectRoot      = $PSScriptRoot
     TempLib          = Join-Path $PSScriptRoot 'templib'
-    SourcePath       = Join-Path $PSScriptRoot 'src'
     OutputPath       = Join-Path $PSScriptRoot 'output'
     DestinationPath  = Join-Path $PSScriptRoot 'output' 'lib'
     ModuleSourcePath = Join-Path $PSScriptRoot 'module'
     DocsPath         = Join-Path $PSScriptRoot 'docs' 'en-US'
     TestPath         = Join-Path $PSScriptRoot 'tests'
-    CsprojPath       = Join-Path $PSScriptRoot 'src' "$modulename.csproj"
+    CsprojPath       = Join-Path $PSScriptRoot 'src' 'PSTextMate' 'PSTextMate.csproj'
 }
 
 task Clean {
@@ -35,14 +36,32 @@ task Build {
         Write-Warning 'C# project not found, skipping Build'
         return
     }
-    exec { dotnet publish $folders.CsprojPath --configuration $Configuration --nologo --verbosity minimal --output $folders.TempLib }
+    exec {
+        dotnet publish $folders.CsprojPath --configuration $Configuration --nologo --verbosity minimal --output $folders.TempLib
+    }
     $null = New-Item -Path $folders.outputPath -ItemType Directory -Force
     $rids = @('win-x64', 'osx-arm64', 'linux-x64','linux-arm64','win-arm64')
     foreach ($rid in $rids) {
         $ridDest = Join-Path $folders.DestinationPath $rid
         $null = New-Item -Path $ridDest -ItemType Directory -Force
         $nativePath = Join-Path $folders.TempLib 'runtimes' $rid 'native'
-        Get-ChildItem -Path $nativePath -File | Move-Item -Destination $ridDest -Force
+        if (-not (Test-Path $nativePath -PathType Container)) {
+            continue
+        }
+
+        foreach ($nativeFile in Get-ChildItem -Path $nativePath -File) {
+            $destinationFile = Join-Path $ridDest $nativeFile.Name
+            try {
+                if (Test-Path $destinationFile -PathType Leaf) {
+                    Remove-Item -Path $destinationFile -Force
+                }
+
+                Move-Item -Path $nativeFile.FullName -Destination $ridDest -Force
+            }
+            catch {
+                Write-Warning "Skipping native file update for '$destinationFile': $($_.Exception.Message)"
+            }
+        }
     }
     Get-ChildItem -Path $folders.TempLib -File | Move-Item -Destination $folders.DestinationPath -Force
     if (Test-Path -Path $folders.TempLib -PathType Container) {
@@ -77,12 +96,6 @@ task GenerateHelp -if (-not $SkipHelp) {
         return
     }
 
-    if (-Not (Get-Module PwshSpectreConsole -ListAvailable)) {
-        # just temporarily while im refactoring the PwshSpectreConsole module.
-        $ParentPath = Split-Path $folders.ProjectRoot -Parent
-        Import-Module (Join-Path $ParentPath 'PwshSpectreConsole' 'output' 'PwshSpectreConsole.psd1')
-    }
-
     Import-Module $modulePath -Force
 
     $helpOutputPath = Join-Path $folders.OutputPath 'en-US'
@@ -110,12 +123,6 @@ task Test -if (-not $SkipTests) {
         return
     }
 
-    if (-not (Get-Module PwshSpectreConsole -ListAvailable)) {
-        # just temporarily while im refactoring the PwshSpectreConsole module.
-        $ParentPath = Split-Path $folders.ProjectRoot -Parent
-        Import-Module (Join-Path $ParentPath 'PwshSpectreConsole' 'output' 'PwshSpectreConsole.psd1')
-    }
-
     Import-Module (Join-Path $folders.OutputPath ($folders.ModuleName + '.psd1')) -ErrorAction Stop
     Import-Module (Join-Path $folders.TestPath 'testhelper.psm1') -ErrorAction Stop
 
@@ -127,6 +134,12 @@ task Test -if (-not $SkipTests) {
     Invoke-Pester -Configuration $pesterConfig
 }
 
+task DotNetTest -if (-not $SkipTests) {
+    exec {
+        dotnet test (Join-Path $PSScriptRoot 'tests' 'PSTextMate.InteractiveTests' 'PSTextMate.InteractiveTests.csproj') --configuration $Configuration --nologo
+    }
+}
+
 task CleanAfter {
     if ($script:folders.DestinationPath -and (Test-Path $script:folders.DestinationPath)) {
         Get-ChildItem $script:folders.DestinationPath -File -Recurse | Where-Object { $_.Extension -in '.pdb', '.json' } | Remove-Item -Force -ErrorAction Ignore
@@ -134,5 +147,5 @@ task CleanAfter {
 }
 
 
-task All -Jobs Clean, Build, ModuleFiles, GenerateHelp, CleanAfter , Test
+task All -Jobs Clean, Build, ModuleFiles, GenerateHelp, CleanAfter, Test, DotNetTest
 task BuildAndTest -Jobs Clean, Build, ModuleFiles, CleanAfter #, Test

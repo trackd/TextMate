@@ -9,6 +9,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+
 # Helper function to get paths
 $buildparams = @{
     Configuration = $Configuration

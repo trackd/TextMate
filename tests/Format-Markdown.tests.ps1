@@ -2,6 +2,8 @@ BeforeAll {
     if (-Not (Get-Module 'TextMate')) {
         Import-Module (Join-Path $PSScriptRoot '..' 'output' 'TextMate.psd1') -ErrorAction Stop
     }
+
+    Import-Module (Join-Path $PSScriptRoot 'testhelper.psm1') -Force
 }
 
 
@@ -49,6 +51,36 @@ Describe 'Format-Markdown' {
         $rendered | Should -Match '🖼️\s+Image:\s+logo width'
         $rendered | Should -Not -Match '<img\b'
     }
+
+    It 'Renders task lists with emoji checkbox markers' {
+        $md = "- [x] done`n- [ ] todo"
+        $out = $md | Format-Markdown
+        $rendered = _GetSpectreRenderable -RenderableObject $out
+
+        $rendered | Should -Match '✅\s+done'
+        $rendered | Should -Match '⬜\s+todo'
+    }
+
+    It 'Keeps block headers for quote and code panels' {
+        $md =@"
+            > quoted`n`n```powershell`nWrite-Host 'hi'`n```
+"@
+        $out = $md | Format-Markdown
+        $rendered = _GetSpectreRenderable -RenderableObject $out
+
+        $rendered | Should -Match 'quote'
+        $rendered | Should -Match 'powershell'
+    }
+
+    It 'Renders nested list links with hyperlink target' {
+        $md = "- parent`n  - [nested](https://example.com/nested)"
+        $out = $md | Format-Markdown
+        $rendered = _GetSpectreRenderable -RenderableObject $out
+
+        $rendered | Should -Match 'nested'
+        $rendered | Should -Match 'https://example.com/nested'
+    }
+
     It 'Should have Help and examples' {
         $help = Get-Help Format-Markdown -Full
         $help.Synopsis | Should -Not -BeNullOrEmpty

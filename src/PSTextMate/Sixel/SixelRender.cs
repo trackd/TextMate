@@ -1,0 +1,284 @@
+using SixLabors.ImageSharp;
+using Size = SixLabors.ImageSharp.Size;
+
+namespace PSTextMate.Sixel;
+
+/// <summary>
+/// Contains methods for converting an image to a Sixel format.
+/// </summary>
+internal static class SixelRender {
+    /// <summary>
+    /// The character to use when entering a terminal escape code sequence.
+    /// </summary>
+    internal const char ESC = '\u001b';
+
+    /// <summary>
+    /// The character to indicate the start of a sixel color palette entry or to switch to a new color.
+    /// https://vt100.net/docs/vt3xx-gp/chapter14.html#S14.3.3.
+    /// </summary>
+    internal const char SixelColorStart = '#';
+
+    /// <summary>
+    /// The character to use when a sixel is empty/transparent.
+    /// ? (hex 3F) represents the binary value 000000.
+    /// https://vt100.net/docs/vt3xx-gp/chapter14.html#S14.2.1.
+    /// </summary>
+    internal const char SixelTransparent = '?';
+
+    /// <summary>
+    /// The character to use when entering a repeated sequence of a color in a sixel.
+    /// https://vt100.net/docs/vt3xx-gp/chapter14.html#S14.3.1.
+    /// </summary>
+    internal const char SixelRepeat = '!';
+
+    /// <summary>
+    /// The character to use when moving to the next line in a sixel.
+    /// https://vt100.net/docs/vt3xx-gp/chapter14.html#S14.3.5.
+    /// </summary>
+    internal const char SixelDECGNL = '-';
+
+    /// <summary>
+    /// The character to use when going back to the start of the current line in a sixel to write more data over it.
+    /// https://vt100.net/docs/vt3xx-gp/chapter14.html#S14.3.4.
+    /// </summary>
+    internal const char SixelDECGCR = '$';
+    /// <summary>
+    /// The start of a sixel sequence.
+    /// https://vt100.net/docs/vt3xx-gp/chapter14.html#S14.2.1.
+    /// </summary>
+    internal static readonly string SixelStart = $"{ESC}P0;1q";
+    /// <summary>
+    /// The raster settings for setting the sixel pixel ratio to 1:1 so images are square when rendered instead of the 2:1 double height default.
+    /// https://vt100.net/docs/vt3xx-gp/chapter14.html#S14.3.2.
+    /// </summary>
+    internal const string SixelRaster = "\"1;1;";
+    /// <summary>
+    /// The end of a sixel sequence.
+    /// </summary>
+    internal static readonly string ST = $"{ESC}\\";
+    internal const string SixelColorParam = ";2;";
+
+    /// <summary>
+    /// The transparent color for the sixel, this is black but the sixel should be transparent so this is not visible.
+    /// </summary>
+    internal const string SixelTransparentColor = "#0;2;0;0;0";
+
+    /// <summary>
+    /// explicit space char for clarity
+    /// </summary>
+    internal const char Space = ' ';
+    internal const char Divider = ';';
+
+    /// <summary>
+    /// Converts an image to a Sixel object.
+    /// This uses a copy of the c# sixel codec from @trackd and @ShaunLawrie in https://github.com/trackd/Sixel.
+    /// </summary>
+    /// <param name="image">The image to convert.</param>
+    /// <param name="cellWidth">The width of the cell in terminal cells.</param>
+    /// <param name="disableAnimation">Whether to disable animation for the image and only load the first frame.</param>
+    /// <param name="maxCellHeight">Optional maximum height in terminal cells. When set, the image will be scaled down
+    /// to fit within this height while maintaining its aspect ratio. This prevents sixel images from scrolling the
+    /// terminal during rendering which misaligns with Spectre Console's cursor position tracking.</param>
+    /// <returns>The Sixel object.</returns>
+    public static Sixel ImageToSixel(Image<Rgba32> image, int cellWidth, bool disableAnimation = false, int? maxCellHeight = null) {
+        // We're going to resize the image when it's rendered, so use a copy to leave the original untouched.
+        Image<Rgba32> imageClone = image.Clone();
+
+        // Convert to pixel sizes.
+        CellSize cellSize = Compatibility.GetCellSize();
+        int pixelWidth = cellWidth * cellSize.PixelWidth;
+        int pixelHeight = (int)Math.Round((double)imageClone.Height / imageClone.Width * pixelWidth);
+
+        // Cap the height to prevent sixel scrolling artifacts.
+        // When a sixel image is taller than the terminal, it scrolls the terminal during
+        // rendering which misaligns with Spectre Console's cursor position tracking.
+        if (maxCellHeight.HasValue && maxCellHeight.Value > 0) {
+            int maxPixelHeight = maxCellHeight.Value * cellSize.PixelHeight;
+            if (pixelHeight > maxPixelHeight) {
+                pixelHeight = maxPixelHeight;
+                pixelWidth = (int)Math.Round((double)imageClone.Width / imageClone.Height * pixelHeight);
+                cellWidth = (int)Math.Ceiling((double)pixelWidth / cellSize.PixelWidth);
+            }
+        }
+
+        imageClone.Mutate(ctx => {
+            // Resize the image to the target size
+            ctx.Resize(new ResizeOptions() {
+                Sampler = KnownResamplers.Bicubic,
+                Size = new Size(pixelWidth, pixelHeight),
+                PremultiplyAlpha = false,
+            });
+
+            // Sixel supports 256 colors max
+            ctx.Quantize(new OctreeQuantizer(new() {
+                MaxColors = 256,
+            }));
+        });
+
+        int cellPixelHeight = cellSize.PixelHeight;
+        int cellHeight = (int)Math.Ceiling((double)pixelHeight / cellPixelHeight);
+        var sixelStrings = new List<string>();
+
+        for (int i = 0; i < imageClone.Frames.Count; i++) {
+            sixelStrings.Add(
+                FrameToSixelString(
+                    imageClone.Frames[i],
+                    cellHeight,
+                    cellPixelHeight));
+
+            if (disableAnimation) {
+                break;
+            }
+        }
+
+        return new Sixel(
+            pixelWidth,
+            pixelHeight,
+            cellHeight,
+            cellWidth,
+            [.. sixelStrings]
+        );
+    }
+
+    /// <summary>
+    /// Converts an image frame to a Sixel string.
+    /// </summary>
+    /// <param name="frame">The image frame to convert.</param>
+    /// <param name="cellHeight">The height of the cell in terminal cells.</param>
+    /// <param name="cellPixelHeight">The height of in individual cell in pixels.</param>
+    /// <returns>The Sixel string.</returns>
+    private static string FrameToSixelString(ImageFrame<Rgba32> frame, int cellHeight, int cellPixelHeight) {
+        var sixelBuilder = new StringBuilder();
+        var palette = new Dictionary<Rgba32, int>();
+        int colorCounter = 1;
+        int y = 0;
+        sixelBuilder.StartSixel(frame.Width, cellHeight * cellPixelHeight);
+        frame.ProcessPixelRows(accessor => {
+            for (y = 0; y < accessor.Height; y++) {
+                Span<Rgba32> pixelRow = accessor.GetRowSpan(y);
+
+                // The value of 1 left-shifted by the remainder of the current row divided by 6 gives the correct sixel character offset from the empty sixel char for each row.
+                // See the description of s...s for more detail on the sixel format https://vt100.net/docs/vt3xx-gp/chapter14.html#S14.2.1
+                char c = (char)('?' + (1 << (y % 6)));
+                int lastColor = -1;
+                int repeatCounter = 0;
+
+                foreach (ref Rgba32 pixel in pixelRow) {
+                    // The colors can be added to the palette and interleaved with the sixel data so long as the color is defined before it is used.
+                    if (!palette.TryGetValue(pixel, out int colorIndex)) {
+                        colorIndex = colorCounter++;
+                        palette[pixel] = colorIndex;
+                        sixelBuilder.AddColorToPalette(pixel, colorIndex);
+                    }
+
+                    // Transparency is a special color index of 0 that exists in our sixel palette.
+                    int colorId = pixel.A == 0 ? 0 : colorIndex;
+
+                    // Sixel data will use a repeat entry if the color is the same as the last one.
+                    // https://vt100.net/docs/vt3xx-gp/chapter14.html#S14.3.1
+                    if (colorId == lastColor || repeatCounter == 0) {
+                        // If the color was repeated go to the next loop iteration to check the next pixel.
+                        lastColor = colorId;
+                        repeatCounter++;
+                        continue;
+                    }
+
+                    // Every time the color is not repeated the previous color is written to the string.
+                    sixelBuilder.AppendSixel(lastColor, repeatCounter, c);
+
+                    // Remember the current color and reset the repeat counter.
+                    lastColor = colorId;
+                    repeatCounter = 1;
+                }
+
+                // Write the last color and repeat counter to the string for the current row.
+                sixelBuilder.AppendSixel(lastColor, repeatCounter, c);
+
+                // Add a carriage return at the end of each row and a new line every 6 pixel rows.
+                sixelBuilder.AppendCarriageReturn();
+                if (y % 6 == 5) {
+                    sixelBuilder.AppendNextLine();
+                }
+            }
+
+            // Padding to ensure the cursor finishes below the image not halfway through the rendered pixels.
+            for (int padding = y; padding <= (cellHeight * cellPixelHeight); padding++) {
+                if (padding % 6 == 5) {
+                    sixelBuilder.AppendNextLine();
+                }
+            }
+
+            // And a final newline to position the cursor under the image.
+            sixelBuilder.AppendNextLine();
+        });
+
+        sixelBuilder.AppendExitSixel();
+
+        return sixelBuilder.ToString();
+    }
+
+    private static void AddColorToPalette(this StringBuilder sixelBuilder, Rgba32 pixel, int colorIndex) {
+        // rgb 0-255 needs to be translated to 0-100 for sixel.
+        (int r, int g, int b) = (
+            pixel.R * 100 / 255,
+            pixel.G * 100 / 255,
+            pixel.B * 100 / 255
+        );
+
+        _ = sixelBuilder
+        .Append(SixelColorStart)
+        .Append(colorIndex)
+        .Append(SixelColorParam)
+        .Append(r)
+        .Append(Divider)
+        .Append(g)
+        .Append(Divider)
+        .Append(b);
+    }
+    private static void AppendSixel(this StringBuilder sixelBuilder, int colorIndex, int repeatCounter, char sixel) {
+        if (colorIndex == 0) {
+            // Transparent pixels are a special case and are always 0 in the palette.
+            sixel = SixelTransparent;
+        }
+        if (repeatCounter <= 1) {
+            // single entry
+            _ = sixelBuilder
+            .Append(SixelColorStart)
+            .Append(colorIndex)
+            .Append(sixel);
+        }
+        else {
+            // add repeats
+            _ = sixelBuilder
+            .Append(SixelColorStart)
+            .Append(colorIndex)
+            .Append(SixelRepeat)
+            .Append(repeatCounter)
+            .Append(sixel);
+        }
+    }
+    private static void AppendCarriageReturn(this StringBuilder sixelBuilder) {
+        _ = sixelBuilder
+        .Append(SixelDECGCR);
+    }
+
+    private static void AppendNextLine(this StringBuilder sixelBuilder) {
+        _ = sixelBuilder
+        .Append(SixelDECGNL);
+    }
+
+    private static void AppendExitSixel(this StringBuilder sixelBuilder) {
+        _ = sixelBuilder
+        .Append(ST);
+    }
+
+    private static void StartSixel(this StringBuilder sixelBuilder, int width, int height) {
+        _ = sixelBuilder
+        .Append(SixelStart)
+        .Append(SixelRaster)
+        .Append(width)
+        .Append(Divider)
+        .Append(height)
+        .Append(SixelTransparentColor);
+    }
+}
