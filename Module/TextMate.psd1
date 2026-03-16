@@ -1,6 +1,6 @@
 @{
     RootModule           = 'TextMate.psm1'
-    ModuleVersion        = '0.2.0'
+    ModuleVersion        = '0.2.1'
     GUID                 = 'fe78d2cb-2418-4308-9309-a0850e504cd6'
     Author               = 'trackd'
     CompanyName          = 'trackd'
