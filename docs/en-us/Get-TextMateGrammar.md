@@ -26,7 +26,7 @@ This cmdlet has the following aliases,
 
 ## DESCRIPTION
 
-Get-TextMateGrammar returns detailed `TextMateSharp.Grammars.Language` objects describing available grammars, file extensions, scopes, and other metadata. Useful for tooling that needs to map file types to TextMate language IDs.
+Get-TextMateGrammar returns detailed `PSTextMate.Core.Language` objects describing available grammars, file extensions, scopes, and other metadata. Useful for tooling that needs to map file types to TextMate language IDs.
 
 ## EXAMPLES
 
@@ -67,9 +67,9 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## OUTPUTS
 
-### TextMateSharp.Grammars.Language
+### PSTextMate.Core.Language
 
-Emits `Language` objects from TextMateSharp describing the grammar, scope name, file extensions and any available configuration.
+Emits `Language` objects owned by TextMate describing the grammar, scope name, file extensions and any available configuration.
 
 ## NOTES
 

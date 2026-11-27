@@ -9,14 +9,14 @@ schema: 2.0.0
 
 ## SYNOPSIS
 
-Displays syntax-highlighted text using TextMate grammars. Accepts strings or file input and returns a `HighlightedText` object for rendering.
+Displays syntax-highlighted text using TextMate grammars. Accepts strings or file input and returns a `HighlightedDocument` object for rendering.
 
 ## SYNTAX
 
 ### Default (Default)
 
 ```
-Format-TextMate [-InputObject] <psobject> [-Language <string>] [-Alternate] [-Theme <ThemeName>]
+Format-TextMate [-InputObject] <psobject> [-Language <string>] [-Alternate] [-Theme <string>]
  [-LineNumbers] [<CommonParameters>]
 ```
 
@@ -60,12 +60,75 @@ Get-Content README.md -Raw | Format-TextMate -Theme SolarizedDark
 
 ## PARAMETERS
 
+### -Page
+
+Opens the built-in TextMate pager instead of returning output. Navigation, search and terminal lifecycle are independent of OutputFormat. Redirected output is written as plain text.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Width
+
+Sets the common layout width in terminal columns for every output format. When omitted, reads the current console window width for each input document, falling back to the host buffer width or 80 columns when unavailable. Specify a width for a narrower application viewport.
+
+```yaml
+Type: System.Int32
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -OutputFormat
+
+Selects Text (default), Spectre, Fullscreen, or Html. Html returns an escaped HTML fragment as a string. Text returns a source-preserving HighlightedDocument displayed directly as ANSI or plain text. Spectre and Fullscreen return native framework objects. TextMate ships their lightweight adapters and automatically imports an installed PwshSpectreConsole or fullscreen module when explicitly requested. A build with -Renderer can bundle the optional UI runtime instead. Every format uses the same rich Markdown, styles, links, wrapping and line numbers at the same Width and theme. Alternate selects Markdown source highlighting for every format. The shared image decoder is optional and independent of OutputFormat.
+
+```yaml
+Type: PSTextMate.Core.OutputFormat
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -Alternate
 
 Forces the standard (non-markdown-specialized) renderer. Useful for previewing how code blocks will appear under the generic renderer.
 
 ```yaml
-Type: SwitchParameter
+Type: System.Management.Automation.SwitchParameter
 DefaultValue: ''
 SupportsWildcards: false
 Aliases: []
@@ -87,7 +150,7 @@ Accepts a `string` or object containing textual content.
 Use `Get-Content -Raw` to pass file contents.
 
 ```yaml
-Type: PSObject
+Type: System.Management.Automation.PSObject
 DefaultValue: ''
 SupportsWildcards: false
 Aliases:
@@ -111,7 +174,7 @@ Hint to force a particular TextMate language ID (for example `powershell`, `csha
 When provided it overrides extension-based inference.
 
 ```yaml
-Type: String
+Type: System.String
 DefaultValue: ''
 SupportsWildcards: false
 Aliases: []
@@ -132,7 +195,7 @@ HelpMessage: ''
 Include line numbers in the output when specified.
 
 ```yaml
-Type: SwitchParameter
+Type: System.Management.Automation.SwitchParameter
 DefaultValue: ''
 SupportsWildcards: false
 Aliases: []
@@ -150,10 +213,10 @@ HelpMessage: ''
 
 ### -Theme
 
-Select a `TextMateSharp.Grammars.ThemeName` used for styling output.
+Select a named theme (built-in or registered with Add-TextMateTheme) used for styling output.
 
 ```yaml
-Type: TextMateSharp.Grammars.ThemeName
+Type: System.String
 DefaultValue: ''
 SupportsWildcards: false
 Aliases: []
@@ -184,9 +247,9 @@ Accepts textual input or objects containing text; commonly used with `Get-Conten
 
 ## OUTPUTS
 
-### PSTextMate.Core.HighlightedText
+### PSTextMate.Core.HighlightedDocument
 
-Returns a `HighlightedText` object representing the rendered tokens and styling metadata.
+Returns a `HighlightedDocument` object representing the rendered tokens and styling metadata.
 
 ## NOTES
 

@@ -9,14 +9,14 @@ schema: 2.0.0
 
 ## SYNOPSIS
 
-Renders PowerShell code using TextMate grammars and returns a PSTextMate.Core.HighlightedText result for display or programmatic use.
+Renders PowerShell code using TextMate grammars and returns a PSTextMate.Core.HighlightedDocument result for display or programmatic use.
 
 ## SYNTAX
 
 ### (All)
 
 ```
-Format-PowerShell [-InputObject] <psobject> [-Theme <ThemeName>] [-LineNumbers] [<CommonParameters>]
+Format-PowerShell [-InputObject] <psobject> [-Theme <string>] [-LineNumbers] [<CommonParameters>]
 ```
 
 ## ALIASES
@@ -26,7 +26,7 @@ This cmdlet has the following aliases,
 
 ## DESCRIPTION
 
-Format-PowerShell highlights PowerShell source and script files. Input can be provided as pipeline text or via file contents. The resulting `HighlightedText` can be used with console renderers or further processed. Use `-Theme` and `-LineNumbers` to adjust output.
+Format-PowerShell highlights PowerShell source and script files. Input can be provided as pipeline text or via file contents. The resulting `HighlightedDocument` can be used with console renderers or further processed. Use `-Theme` and `-LineNumbers` to adjust output.
 
 ## EXAMPLES
 
@@ -36,11 +36,15 @@ Format-PowerShell highlights PowerShell source and script files. Input can be pr
 'Get-Process | Where-Object { $_.CPU -gt 1 }' | Format-PowerShell
 ```
 
+Highlights the snippet as source text without executing it.
+
 ### Example 2: Highlight a script file with line numbers
 
 ```
 Get-Content .\scripts\deploy.ps1 -Raw | Format-PowerShell -LineNumbers
 ```
+
+Displays the script with a line-number gutter.
 
 ### Example 3: Pipe FileInfo object and render with theme
 
@@ -48,7 +52,72 @@ Get-Content .\scripts\deploy.ps1 -Raw | Format-PowerShell -LineNumbers
 Get-ChildItem .\scripts\*.ps1 | Format-PowerShell -Theme Monokai
 ```
 
+Reads each matching file and highlights it using the Monokai theme.
+
 ## PARAMETERS
+
+### -Page
+
+Opens the built-in TextMate pager instead of returning output. Navigation, search and terminal lifecycle are independent of OutputFormat. Redirected output is written as plain text.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Width
+
+Sets the common layout width in terminal columns for every output format. When omitted, reads the current console window width for each input document, falling back to the host buffer width or 80 columns when unavailable. Specify a width for a narrower application viewport.
+
+```yaml
+Type: System.Int32
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -OutputFormat
+
+Selects Text (default), Spectre, Fullscreen, or Html. Html returns an escaped HTML fragment as a string. Text returns a source-preserving HighlightedDocument displayed directly as ANSI or plain text. Spectre and Fullscreen return native framework objects. TextMate ships their lightweight adapters and automatically imports an installed PwshSpectreConsole or fullscreen module when explicitly requested. A build with -Renderer can bundle the optional UI runtime instead. Every format uses the same rich Markdown, styles, links, wrapping and line numbers at the same Width and theme. Alternate selects Markdown source highlighting for every format. The shared image decoder is optional and independent of OutputFormat.
+
+```yaml
+Type: PSTextMate.Core.OutputFormat
+DefaultValue: ''
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
 
 ### -InputObject
 
@@ -57,7 +126,7 @@ Typically used with `Get-Content -Raw` or piping literal strings.
 Accepts FileInfo objects
 
 ```yaml
-Type: PSObject
+Type: System.Management.Automation.PSObject
 DefaultValue: ''
 SupportsWildcards: false
 Aliases:
@@ -80,7 +149,7 @@ HelpMessage: ''
 When present, include line numbers in the rendered output.
 
 ```yaml
-Type: SwitchParameter
+Type: System.Management.Automation.SwitchParameter
 DefaultValue: ''
 SupportsWildcards: false
 Aliases: []
@@ -98,10 +167,10 @@ HelpMessage: ''
 
 ### -Theme
 
-Chooses a `TextMateSharp.Grammars.ThemeName` for styling the highlighted output.
+Chooses a named theme (built-in or registered with Add-TextMateTheme) for styling the highlighted output.
 
 ```yaml
-Type: TextMateSharp.Grammars.ThemeName
+Type: System.String
 DefaultValue: ''
 SupportsWildcards: false
 Aliases: []
@@ -132,9 +201,9 @@ Accepts textual input representing PowerShell source.
 
 ## OUTPUTS
 
-### PSTextMate.Core.HighlightedText
+### PSTextMate.Core.HighlightedDocument
 
-Returns the highlighted representation of the input source as a `HighlightedText` object.
+Returns the highlighted representation of the input source as a `HighlightedDocument` object.
 
 ## NOTES
 
