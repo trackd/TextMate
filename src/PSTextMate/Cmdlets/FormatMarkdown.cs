@@ -6,7 +6,7 @@ namespace PSTextMate.Commands;
 /// </summary>
 [Cmdlet(VerbsCommon.Format, "Markdown")]
 [Alias("fmd")]
-[OutputType(typeof(HighlightedText))]
+[OutputType(typeof(HighlightedDocument), typeof(string))]
 public sealed class FormatMarkdownCmdlet : TextMateCmdletBase {
     /// <summary>
     /// When present, force the standard renderer even for Markdown grammars.

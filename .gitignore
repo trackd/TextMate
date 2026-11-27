@@ -19,3 +19,10 @@ src/Utilities/TMConsole.cs
 templib/**
 todo.md
 sixlabors.lic
+
+.local/
+TestResults/
+!src/PSTextMate/LICENSE.Fullscreen.txt
+!src/PSTextMate/LICENSE.Unicode.txt
+!src/PSTextMate/grammars/LICENSE.KDL.txt
+!src/PSTextMate/grammars/LICENSE.TOML.txt

@@ -1,5 +1,10 @@
 <Solution>
   <Project Path="src/PSTextMate/PSTextMate.csproj" />
+  <Project Path="src/PSTextMate.Markdown/PSTextMate.Markdown.csproj" />
+  <Project Path="src/PSTextMate.Images/PSTextMate.Images.csproj" />
+  <Project Path="src/PSTextMate.Spectre/PSTextMate.Spectre.csproj" />
+  <Project Path="src/PSTextMate.XenoAtom/PSTextMate.XenoAtom.csproj" />
   <Project Path="src/PSTextMate.ALC/PSTextMate.ALC.csproj" />
   <Project Path="tests/PSTextMate.InteractiveTests/PSTextMate.InteractiveTests.csproj" />
+  <Project Path="tests/PSTextMate.CoreTests/PSTextMate.CoreTests.csproj" />
 </Solution>

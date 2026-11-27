@@ -1,0 +1,11 @@
+global using System.Buffers;
+global using System.Collections;
+global using System.Collections.Concurrent;
+global using System.Collections.ObjectModel;
+global using System.Globalization;
+global using System.Management.Automation;
+global using System.Management.Automation.Language;
+global using System.Runtime.CompilerServices;
+global using System.Text;
+global using PSTextMate.Core;
+global using PSTextMate.Utilities;

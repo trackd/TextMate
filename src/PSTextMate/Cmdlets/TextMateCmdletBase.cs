@@ -1,302 +1,156 @@
+using System.Management.Automation.Host;
 
 namespace PSTextMate.Commands;
 
-/// <summary>
-/// Base cmdlet for rendering input using TextMate language or extension tokens.
-/// </summary>
-public abstract class TextMateCmdletBase : PSCmdlet {
-    private readonly List<string> _inputObjectBuffer = [];
+/// <summary>Shared input handling and optional output selection for highlighting cmdlets.</summary>
+public abstract class TextMateCmdletBase : PSCmdlet, IDisposable {
+    private readonly List<string> _inputBuffer = [];
+    private readonly CancellationTokenSource _cancellation = new();
 
-    /// <summary>
-    /// String content or file path to render with syntax highlighting.
-    /// </summary>
-    [Parameter(
-        Mandatory = true,
-        ValueFromPipeline = true,
-        ValueFromPipelineByPropertyName = true,
-        Position = 0
-    )]
+    [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true, Position = 0)]
     [AllowEmptyString]
-    [System.Management.Automation.AllowNull]
+    [AllowNull]
     [Alias("FullName", "Path")]
     public PSObject? InputObject { get; set; }
 
-    /// <summary>
-    /// Color theme to use for syntax highlighting.
-    /// </summary>
     [Parameter]
-    public ThemeName Theme { get; set; } = ThemeName.DarkPlus;
+    [ArgumentCompleter(typeof(ThemeCompleter))]
+    [ValidateNotNullOrEmpty]
+    public string Theme { get; set; } = "DarkPlus";
 
-    /// <summary>
-    /// When present, render a gutter with line numbers.
-    /// </summary>
+    [Parameter]
+    public OutputFormat OutputFormat { get; set; } = OutputFormat.Text;
+
     [Parameter]
     public SwitchParameter LineNumbers { get; set; }
 
-
-    /// <summary>
-    /// When present, always render through the interactive pager.
-    /// </summary>
     [Parameter]
     public SwitchParameter Page { get; set; }
 
-    /// <summary>
-    /// Fixed language or extension token used for rendering.
-    /// </summary>
+    /// <summary>Common presentation width for every output backend.</summary>
+    [Parameter]
+    [ValidateRange(8, 32767)]
+    public int Width { get; set; }
+
     protected abstract string FixedToken { get; }
-
-    /// <summary>
-    /// Indicates whether the fixed token should be treated as a file extension.
-    /// </summary>
     protected virtual bool FixedTokenIsExtension => false;
-
-    /// <summary>
-    /// Indicates whether a Markdown base directory should be resolved for image paths.
-    /// </summary>
     protected virtual bool UsesMarkdownBaseDirectory => false;
-
-    /// <summary>
-    /// Indicates whether an extension hint should be inferred from pipeline metadata.
-    /// </summary>
     protected virtual bool UsesExtensionHint => false;
-
-    /// <summary>
-    /// Error identifier used for error records.
-    /// </summary>
-    protected virtual string ErrorId => GetType().Name;
-
-    /// <summary>
-    /// Indicates whether alternate rendering should be used.
-    /// </summary>
     protected virtual bool UseAlternate => false;
-
-    /// <summary>
-    /// Default language token used when no explicit input is available.
-    /// </summary>
     protected virtual string? DefaultLanguage => null;
-
-    /// <summary>
-    /// Resolved extension hint from the pipeline input.
-    /// </summary>
     protected string? SourceExtensionHint { get; private set; }
-
-    /// <summary>
-    /// Resolved base directory for markdown rendering.
-    /// </summary>
     protected string? SourceBaseDirectory { get; private set; }
 
     protected override void ProcessRecord() {
-        if (MyInvocation.ExpectingInput) {
-            if (InputObject?.BaseObject is FileInfo file) {
-                try {
-                    foreach (HighlightedText result in ProcessPathInput(file)) {
-                        EmitHighlightedResult(result);
-                    }
-                }
-                catch (Exception ex) {
-                    WriteError(new ErrorRecord(ex, ErrorId, ErrorCategory.NotSpecified, file));
-                }
+        if (InputObject?.BaseObject is null)
+            return;
+        try {
+            if (InputObject.BaseObject is FileInfo file) {
+                ProcessFile(file);
             }
-            else if (InputObject?.BaseObject is string inputString) {
-                if (UsesMarkdownBaseDirectory || UsesExtensionHint) {
-                    EnsureSourceHints();
-                }
-
-                _inputObjectBuffer.AddRange(TextMateHelper.SplitToLines(inputString));
+            else if (MyInvocation.ExpectingInput && InputObject.BaseObject is string text) {
+                CaptureSourceHints();
+                _inputBuffer.Add(text);
+            }
+            else {
+                ProcessFile(new FileInfo(GetUnresolvedProviderPathFromPSPath(InputObject.ToString())));
             }
         }
-        else if (InputObject is not null) {
-            FileInfo file = new(GetUnresolvedProviderPathFromPSPath(InputObject?.ToString()));
-            if (!file.Exists) {
-                return;
-            }
-
-            try {
-                foreach (HighlightedText result in ProcessPathInput(file)) {
-                    EmitHighlightedResult(result);
-                }
-            }
-            catch (Exception ex) {
-                WriteError(new ErrorRecord(ex, ErrorId, ErrorCategory.NotSpecified, file));
-            }
+        catch (Exception exception) when (exception is not PipelineStoppedException) {
+            WriteError(new ErrorRecord(exception, GetType().Name, ErrorCategory.InvalidOperation, InputObject));
         }
     }
 
     protected override void EndProcessing() {
         try {
-            if (_inputObjectBuffer.Count == 0) {
+            if (_inputBuffer.Count == 0)
                 return;
-            }
-
-            if (UsesMarkdownBaseDirectory || UsesExtensionHint) {
-                EnsureSourceHints();
-            }
-
-            HighlightedText? result = ProcessStringInput();
-            if (result is not null) {
-                EmitHighlightedResult(result);
-            }
+            string source = _inputBuffer.Count == 1 ? _inputBuffer[0] : string.Join('\n', _inputBuffer);
+            (string token, bool extension) = ResolveTokenForStringInput();
+            Emit(source, token, extension);
         }
-        catch (Exception ex) {
-            WriteError(new ErrorRecord(ex, ErrorId, ErrorCategory.NotSpecified, MyInvocation.BoundParameters));
+        catch (Exception exception) when (exception is not PipelineStoppedException) {
+            WriteError(new ErrorRecord(exception, GetType().Name, ErrorCategory.InvalidOperation, InputObject));
+        }
+        finally {
+            Dispose();
         }
     }
 
-    private HighlightedText? ProcessStringInput() {
-        string[] lines = [.. _inputObjectBuffer];
+    protected override void StopProcessing() => _cancellation.Cancel();
 
-        if (lines.AllIsNullOrEmpty()) {
-            WriteVerbose("All input strings are null or empty");
-            return null;
-        }
-
-        (string token, bool asExtension) = ResolveTokenForStringInput();
-        IRenderable[]? renderables = TextMateProcessor.ProcessLines(lines, Theme, token, isExtension: asExtension, forceAlternate: UseAlternate);
-        WriteRenderingDiagnostics(token, asExtension, renderables);
-
-        return renderables is null
-            ? null
-            : new HighlightedText(
-                renderables,
-                showLineNumbers: LineNumbers.IsPresent,
-                language: token,
-                page: Page.IsPresent,
-                sourceLines: Page.IsPresent ? lines : null
-            );
+    public void Dispose() {
+        _cancellation.Dispose();
+        GC.SuppressFinalize(this);
     }
 
-    private void EmitHighlightedResult(HighlightedText result) {
+    private void ProcessFile(FileInfo file) {
+        if (!file.Exists)
+            throw new FileNotFoundException($"File not found: {file.FullName}", file.FullName);
+        SourceBaseDirectory = file.DirectoryName;
+        SourceExtensionHint = file.Extension;
+        (string token, bool extension) = ResolveTokenForPathInput(file);
+        Emit(File.ReadAllText(file.FullName), token, extension);
+    }
+
+    private void Emit(string source, string token, bool extension) {
+        HighlightedDocument document = SyntaxHighlighter.Highlight(source, token, Theme, extension,
+            LineNumbers.IsPresent, _cancellation.Token);
+        if (document.LimitExceededCount != 0)
+            WriteWarning($"Highlighting reached the regex work limit {document.LimitExceededCount} times; some styles may be incomplete.");
+        var options = new RendererOptions(UseAlternate, SourceBaseDirectory, ResolveWidth(), ConstrainWidth: Width > 0);
         if (Page.IsPresent) {
-            result.ShowPager();
-            return;
+            TextPager.Show(document, options, _cancellation.Token);
         }
-
-        WriteObject(result);
+        else {
+            object result = OutputRenderer.Render(document, OutputFormat, options);
+            if (OutputFormat is OutputFormat.Text or OutputFormat.Html) {
+                WriteObject(result);
+            }
+            else {
+                var native = PSObject.AsPSObject(result);
+                native.TypeNames.Insert(0, "PSTextMate.NativeOutput");
+                WriteObject(native);
+            }
+        }
     }
 
-    private IEnumerable<HighlightedText> ProcessPathInput(FileInfo filePath) {
-        if (!filePath.Exists) {
-            throw new FileNotFoundException($"File not found: {filePath.FullName}", filePath.FullName);
+    private int ResolveWidth() {
+        if (Width > 0)
+            return Width;
+        try {
+            int width = Host.UI?.RawUI?.WindowSize.Width ?? 0;
+            if (width >= 8)
+                return width;
         }
+        catch (Exception error) when (error is HostException or NotImplementedException or NotSupportedException or InvalidOperationException or IOException) {
 
-        if (UsesMarkdownBaseDirectory) {
-            string markdownBaseDir = filePath.DirectoryName ?? Environment.CurrentDirectory;
-            Rendering.ImageRenderer.CurrentMarkdownDirectory = markdownBaseDir;
-            WriteVerbose($"Set markdown base directory for image resolution: {markdownBaseDir}");
         }
-
-        (string token, bool asExtension) = ResolveTokenForPathInput(filePath);
-        WriteVerbose($"Processing file: {filePath.FullName} with {(asExtension ? "extension" : "language")}: {token}");
-
-        string[] lines = File.ReadAllLines(filePath.FullName);
-        IRenderable[]? renderables = TextMateProcessor.ProcessLines(lines, Theme, token, isExtension: asExtension, forceAlternate: UseAlternate);
-        WriteRenderingDiagnostics(token, asExtension, renderables);
-
-        if (renderables is not null) {
-            yield return new HighlightedText(
-                renderables,
-                showLineNumbers: LineNumbers.IsPresent,
-                language: token,
-                page: Page.IsPresent,
-                sourceLines: Page.IsPresent ? lines : null
-            );
+        try {
+            int width = Host.UI?.RawUI?.BufferSize.Width ?? 0;
+            if (width >= 8)
+                return width;
         }
+        catch (Exception error) when (error is HostException or NotImplementedException or NotSupportedException or InvalidOperationException or IOException) {
+
+        }
+        return 80;
     }
 
     protected virtual (string token, bool asExtension) ResolveTokenForStringInput() => ResolveFixedToken();
-
     protected virtual (string token, bool asExtension) ResolveTokenForPathInput(FileInfo filePath) => ResolveFixedToken();
+    protected (string token, bool asExtension) ResolveFixedToken() => FixedTokenIsExtension
+        ? (FixedToken.StartsWith('.') ? FixedToken : "." + FixedToken, true)
+        : TextMateResolver.ResolveToken(FixedToken);
 
-    protected (string token, bool asExtension) ResolveFixedToken() {
-        if (!FixedTokenIsExtension) {
-            return TextMateResolver.ResolveToken(FixedToken);
-        }
-
-        string token = FixedToken.StartsWith('.') ? FixedToken : "." + FixedToken;
-        return (token, true);
-    }
-
-    private void EnsureSourceHints() {
-        if (InputObject is null) {
+    private void CaptureSourceHints() {
+        string? hint = InputObject?.Properties["PSPath"]?.Value as string
+            ?? InputObject?.Properties["FullName"]?.Value as string
+            ?? InputObject?.Properties["PSChildName"]?.Value as string;
+        if (string.IsNullOrEmpty(hint))
             return;
-        }
-
-        if (SourceBaseDirectory is not null && SourceExtensionHint is not null) {
-            return;
-        }
-
-        string? hint = InputObject.Properties["PSPath"]?.Value as string
-                        ?? InputObject.Properties["FullName"]?.Value as string
-                        ?? InputObject.Properties["PSChildName"]?.Value as string;
-        if (string.IsNullOrEmpty(hint)) {
-            return;
-        }
-
-        if (SourceExtensionHint is null) {
-            string ext = Path.GetExtension(hint);
-            if (string.IsNullOrWhiteSpace(ext)) {
-                string resolvedHint = GetUnresolvedProviderPathFromPSPath(hint);
-                ext = Path.GetExtension(resolvedHint);
-            }
-
-            if (!string.IsNullOrWhiteSpace(ext)) {
-                SourceExtensionHint = ext;
-                WriteVerbose($"Detected extension hint from input: {ext}");
-            }
-        }
-
-        if (SourceBaseDirectory is null) {
-            string resolvedPath = GetUnresolvedProviderPathFromPSPath(hint);
-            string? baseDir = Path.GetDirectoryName(resolvedPath);
-            if (!string.IsNullOrWhiteSpace(baseDir)) {
-                SourceBaseDirectory = baseDir;
-                Rendering.ImageRenderer.CurrentMarkdownDirectory = baseDir;
-                WriteVerbose($"Set markdown base directory from input: {baseDir}");
-            }
-        }
-    }
-
-    private void WriteRenderingDiagnostics(string token, bool asExtension, IRenderable[]? renderables) {
-        if (renderables is null) {
-            WriteVerbose("Rendering produced no output renderables.");
-            return;
-        }
-
-        WriteVerbose($"Rendering produced {renderables.Length} renderables.");
-
-        if (!ContainsImageRenderables(renderables)) {
-            return;
-        }
-
-        WriteVerbose("Detected image renderables in output (Sixel/Pixel/Image).");
-
-        if (!IsMarkdownToken(token, asExtension)) {
-            return;
-        }
-
-        WriteDiagnosticIfPresent("Image renderer diagnostic", Rendering.ImageRenderer.GetLastImageError());
-        WriteDiagnosticIfPresent("Sixel diagnostic", Rendering.ImageRenderer.GetLastSixelError());
-    }
-
-    private static bool ContainsImageRenderables(IEnumerable<IRenderable> renderables)
-        => renderables.Any(static r => {
-            string name = r.GetType().Name;
-            return name.Contains("Sixel", StringComparison.OrdinalIgnoreCase)
-                || name.Contains("Pixel", StringComparison.OrdinalIgnoreCase)
-                || name.Contains("Image", StringComparison.OrdinalIgnoreCase);
-        });
-
-    private void WriteDiagnosticIfPresent(string label, string? value) {
-        if (!string.IsNullOrWhiteSpace(value)) {
-            WriteVerbose($"{label}: {value}");
-        }
-    }
-
-    private static bool IsMarkdownToken(string token, bool asExtension) {
-        return asExtension
-            ? token.Equals(".md", StringComparison.OrdinalIgnoreCase)
-                || token.Equals(".markdown", StringComparison.OrdinalIgnoreCase)
-                || token.Equals(".mdown", StringComparison.OrdinalIgnoreCase)
-            : token.Equals("markdown", StringComparison.OrdinalIgnoreCase);
+        string resolved = GetUnresolvedProviderPathFromPSPath(hint);
+        SourceExtensionHint = Path.GetExtension(resolved);
+        SourceBaseDirectory = Path.GetDirectoryName(resolved);
     }
 }
