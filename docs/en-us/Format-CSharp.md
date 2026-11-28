@@ -124,13 +124,13 @@ HelpMessage: ''
 
 ### -InputObject
 
-Accepts a string or object containing source code.
-When receiving pipeline input, the cmdlet treats the value as source text.
-For file processing, pass the file contents (for example with `Get-Content -Raw`).
-FileInfo objects are also accepted
+Accepts source text, a file, or a script block.
+Piped strings are source text; a string passed as an argument is a path unless it cannot be one (it spans several lines, or names a drive that does not exist).
+Script blocks are their source text.
+FileInfo objects and objects with a `FullName` property (or a `Path` property on custom objects) are read as files.
 
 ```yaml
-Type: System.Management.Automation.PSObject
+Type: System.Object
 DefaultValue: ''
 SupportsWildcards: false
 Aliases:

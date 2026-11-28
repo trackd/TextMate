@@ -4,6 +4,55 @@ BeforeAll {
     }
 }
 
+Describe 'Input objects (issue 42)' {
+    BeforeAll {
+        $sample = Join-Path $TestDrive 'sample.cs'
+        Set-Content -LiteralPath $sample -Value 'class A { }'
+    }
+
+    It 'Highlights a piped script block as PowerShell source' {
+        $document = { Get-Date } | Format-TextMate -Language powershell
+        $document.Source.Trim() | Should -BeExactly 'Get-Date'
+        $document.Language | Should -BeExactly 'powershell'
+    }
+
+    It 'Highlights a script block passed to -InputObject without delay-binding it' {
+        function TestPrompt { "PS $($executionContext.SessionState.Path.CurrentLocation)> " }
+        $document = Format-TextMate -InputObject $function:TestPrompt -Language powershell -ErrorAction Stop
+        $document.Source | Should -BeExactly $function:TestPrompt.ToString()
+        (Format-PowerShell { 1 + 1 }).Source.Trim() | Should -BeExactly '1 + 1'
+    }
+
+    It 'Highlights an -InputObject string that cannot be a path: <Name>' -TestCases @(
+        @{ Name = 'several lines'; Text = "if (`$true) {`n    'yes'`n}" }
+        @{ Name = 'a drive that does not exist'; Text = 'if ($global:x) { 1 }' }
+    ) {
+        (Format-PowerShell -InputObject $Text -ErrorAction Stop).Source | Should -BeExactly $Text
+    }
+
+    It 'Still treats a single-line -InputObject string as a path' {
+        Format-PowerShell -InputObject 'missing-file.ps1' -ErrorVariable failure -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        $failure[0].Exception | Should -BeOfType System.IO.FileNotFoundException
+        (Format-TextMate -InputObject $sample).Language | Should -BeExactly 'csharp'
+    }
+
+    It 'Keeps piped strings, files and Get-Content hints' {
+        ('Get-Date' | Format-PowerShell).Source | Should -BeExactly 'Get-Date'
+        (Get-Content -LiteralPath $sample | Format-TextMate).Language | Should -BeExactly 'csharp'
+        (Get-Item -LiteralPath $sample | Format-TextMate).Language | Should -BeExactly 'csharp'
+    }
+
+    It 'Reads the file an object names through FullName or a custom Path' {
+        (Get-Item -LiteralPath $sample | Select-Object FullName | Format-TextMate).Language | Should -BeExactly 'csharp'
+        ([pscustomobject]@{ Path = (Join-Path $TestDrive 'sample.cs') } | Format-TextMate).Source.Trim() | Should -BeExactly 'class A { }'
+    }
+
+    It 'Rejects other piped objects with a clear error instead of reading their Path' {
+        Get-Process -Id $PID | Format-TextMate -ErrorVariable failure -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        $failure[0].Exception.Message | Should -BeLike 'Cannot highlight a Process*'
+    }
+}
+
 Describe 'TextMate output' {
     It 'Fits image requests to remaining viewport rows before decoding pixels' {
         $imageFile = Join-Path $TestDrive 'header.png'

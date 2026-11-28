@@ -121,12 +121,13 @@ HelpMessage: ''
 
 ### -InputObject
 
-Accepts a `string` or object containing PowerShell source text.
-Typically used with `Get-Content -Raw` or piping literal strings.
-Accepts FileInfo objects
+Accepts PowerShell source text, a file, or a script block.
+Piped strings are source text; a string passed as an argument is a path unless it cannot be one (it spans several lines, or names a drive that does not exist).
+Script blocks, piped or passed as an argument, are their source text: `$function:prompt | Format-PowerShell` or `Format-PowerShell { Get-Date }`.
+FileInfo objects and objects with a `FullName` property (or a `Path` property on custom objects) are read as files.
 
 ```yaml
-Type: System.Management.Automation.PSObject
+Type: System.Object
 DefaultValue: ''
 SupportsWildcards: false
 Aliases:

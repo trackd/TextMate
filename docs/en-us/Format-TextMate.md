@@ -146,11 +146,13 @@ HelpMessage: ''
 
 ### -InputObject
 
-Accepts a `string` or object containing textual content.
-Use `Get-Content -Raw` to pass file contents.
+Accepts source text, a file, or a script block.
+Piped strings are source text; a string passed as an argument is a path unless it cannot be one (it spans several lines, or names a drive that does not exist).
+Script blocks, piped or passed as an argument, are their source text, for example `$function:prompt | Format-TextMate`.
+FileInfo objects and objects with a `FullName` property (or a `Path` property on custom objects) are read as files.
 
 ```yaml
-Type: System.Management.Automation.PSObject
+Type: System.Object
 DefaultValue: ''
 SupportsWildcards: false
 Aliases:

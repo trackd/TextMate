@@ -125,11 +125,12 @@ HelpMessage: ''
 
 ### -InputObject
 
-Accepts a string or object containing Markdown text. Common usage is `Get-Content -Raw` piped into the cmdlet.
-FileInfo objects are also accepted
+Accepts Markdown text, a file, or a script block. Common usage is `Get-Content -Raw` piped into the cmdlet.
+Piped strings are Markdown text; a string passed as an argument is a path unless it cannot be one (it spans several lines, or names a drive that does not exist).
+FileInfo objects and objects with a `FullName` property (or a `Path` property on custom objects) are read as files.
 
 ```yaml
-Type: System.Management.Automation.PSObject
+Type: System.Object
 DefaultValue: ''
 SupportsWildcards: false
 Aliases:

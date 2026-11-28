@@ -13,7 +13,12 @@ public abstract class TextMateCmdletBase : PSCmdlet, IDisposable {
     [AllowEmptyString]
     [AllowNull]
     [Alias("FullName", "Path")]
-    public PSObject? InputObject { get; set; }
+    // [object] rather than [PSObject]: PowerShell treats a script block argument to any other pipeline-by-property
+    // parameter type as a delay-bind script block, which fails with ScriptBlockArgumentNoInput without input.
+    // Pipeline values still arrive wrapped, keeping Get-Content's PSPath hints.
+    public object? InputObject { get; set; }
+
+    private PSObject? Input => InputObject is null ? null : PSObject.AsPSObject(InputObject);
 
     [Parameter]
     [ArgumentCompleter(typeof(ThemeCompleter))]
@@ -47,18 +52,32 @@ public abstract class TextMateCmdletBase : PSCmdlet, IDisposable {
     protected override void BeginProcessing() => TerminalCapabilities.Prepare(this);
 
     protected override void ProcessRecord() {
-        if (InputObject?.BaseObject is null)
+        if (Input?.BaseObject is not { } value)
             return;
         try {
-            if (InputObject.BaseObject is FileInfo file) {
+            if (value is FileInfo file) {
                 ProcessFile(file);
             }
-            else if (MyInvocation.ExpectingInput && InputObject.BaseObject is string text) {
+            else if (value is ScriptBlock script) {
+                // A script block is source text, piped or passed to -InputObject: $function:prompt | Format-PowerShell.
+                _inputBuffer.Add(script.ToString());
+            }
+            else if (MyInvocation.ExpectingInput && value is string text) {
                 CaptureSourceHints();
                 _inputBuffer.Add(text);
             }
+            else if (value is string argument && IsSourceText(argument)) {
+                _inputBuffer.Add(argument);
+            }
+            else if (PathProperty(Input) is { } path) {
+                // The FullName and Path aliases: objects that name a file, such as Select-Object FullName output.
+                ProcessFile(new FileInfo(GetUnresolvedProviderPathFromPSPath(path)));
+            }
+            else if (MyInvocation.ExpectingInput && value is not string) {
+                throw new ArgumentException($"Cannot highlight a {value.GetType().Name}. Pipe source strings, files, script blocks or objects with a FullName or Path property; Out-Page pages other objects.");
+            }
             else {
-                ProcessFile(new FileInfo(GetUnresolvedProviderPathFromPSPath(InputObject.ToString())));
+                ProcessFile(new FileInfo(GetUnresolvedProviderPathFromPSPath(Input.ToString())));
             }
         }
         catch (Exception exception) when (exception is not PipelineStoppedException) {
@@ -172,13 +191,47 @@ public abstract class TextMateCmdletBase : PSCmdlet, IDisposable {
         : TextMateResolver.ResolveToken(FixedToken);
 
     private void CaptureSourceHints() {
-        string? hint = InputObject?.Properties["PSPath"]?.Value as string
-            ?? InputObject?.Properties["FullName"]?.Value as string
-            ?? InputObject?.Properties["PSChildName"]?.Value as string;
+        string? hint = Input?.Properties["PSPath"]?.Value as string
+            ?? Input?.Properties["FullName"]?.Value as string
+            ?? Input?.Properties["PSChildName"]?.Value as string;
         if (string.IsNullOrEmpty(hint))
             return;
         string resolved = GetUnresolvedProviderPathFromPSPath(hint);
         SourceExtensionHint = Path.GetExtension(resolved);
         SourceBaseDirectory = Path.GetDirectoryName(resolved);
+    }
+
+    /// <summary>
+    /// An argument string is a path, as it always was, unless it cannot be one: it spans several lines, or the
+    /// provider cannot resolve it at all (for example "if ($global:x) { }" names a drive that does not exist).
+    /// Then it is source text. An existing file always wins, and a well-formed missing path still reports an error.
+    /// </summary>
+    /// <summary>
+    /// FullName names a file on any object. Path only counts on custom objects (Select-Object output, literals):
+    /// on a Process or a service it names an executable, which must not be read as source.
+    /// </summary>
+    private static string? PathProperty(PSObject input) {
+        ReadOnlySpan<string> names = input.BaseObject is PSCustomObject ? ["FullName", "Path"] : ["FullName"];
+        foreach (string name in names) {
+            // Cmdlet output stored in a property (FullName = (Join-Path ...)) stays wrapped in a PSObject.
+            object? value = input.Properties[name]?.Value;
+            if ((value is PSObject wrapper ? wrapper.BaseObject : value) is string { Length: > 0 } path)
+                return path;
+        }
+        return null;
+    }
+
+    private bool IsSourceText(string argument) {
+        if (argument.Length == 0)
+            return false;
+        string path;
+        try {
+            path = GetUnresolvedProviderPathFromPSPath(argument);
+        }
+        catch (Exception error) when (error is System.Management.Automation.DriveNotFoundException or ProviderNotFoundException or ProviderInvocationException
+            or NotSupportedException or ArgumentException or PSArgumentException or ItemNotFoundException) {
+            return true;
+        }
+        return !File.Exists(path) && argument.AsSpan().IndexOfAny('\r', '\n') >= 0;
     }
 }
