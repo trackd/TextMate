@@ -101,6 +101,26 @@ public sealed class ImageSizingTests {
         AssertHeader(ani, new(640, 480));
     }
 
+    [Theory]
+    [InlineData(12, false)]
+    [InlineData(16, false)]
+    [InlineData(40, false)]
+    [InlineData(40, true)]
+    public void AniHeaders_ReadRawDibFramesWithoutIconMaskHeight(int headerSize, bool topDown) {
+        byte[] dib = new byte[headerSize];
+        BinaryPrimitives.WriteInt32LittleEndian(dib, headerSize);
+        if (headerSize == 12) {
+            BinaryPrimitives.WriteUInt16LittleEndian(dib.AsSpan(4), 640);
+            BinaryPrimitives.WriteUInt16LittleEndian(dib.AsSpan(6), 480);
+        }
+        else {
+            BinaryPrimitives.WriteInt32LittleEndian(dib.AsSpan(4), 640);
+            BinaryPrimitives.WriteInt32LittleEndian(dib.AsSpan(8), topDown ? -480 : 480);
+        }
+        AssertHeader(Riff("ACON", Chunk("anih", new byte[36]),
+            Chunk("LIST", [.. "fram"u8, .. Chunk("icon", dib)])), new(640, 480));
+    }
+
     [Fact]
     public void NewHeaderPaths_AllocateNothingAfterWarmupAndDoNotReadPixelPayloads() {
         byte[][] headers = [

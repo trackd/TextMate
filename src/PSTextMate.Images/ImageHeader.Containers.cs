@@ -74,13 +74,31 @@ internal static partial class ImageHeader {
             if (next > end)
                 return false;
             if (chunk[..4].SequenceEqual("icon"u8)) {
-                if (!ReadIcon(stream, content, content + length, ref budget, out ImageDimensions frame))
+                if (!ReadAniFrame(stream, content, content + length, ref budget, out ImageDimensions frame))
                     return false;
                 dimensions = new(Math.Max(dimensions.Width, frame.Width), Math.Max(dimensions.Height, frame.Height));
             }
             position = next;
         }
         return position == end && dimensions.Width > 0 && dimensions.Height > 0;
+    }
+
+    private static bool ReadAniFrame(Stream stream, long start, long end, ref int budget, out ImageDimensions dimensions) {
+        dimensions = default;
+        Span<byte> header = stackalloc byte[12];
+        if (!ReadAt(stream, start, end, header))
+            return false;
+        uint dib = BinaryPrimitives.ReadUInt32LittleEndian(header);
+        if (dib is not 12 and not 16 and not 40 and not 52 and not 56 and not 64 and not 108 and not 124)
+            return ReadIcon(stream, start, end, ref budget, out dimensions);
+        if (dib > end - start)
+            return false;
+        // AF_ICON-free ANI frames are raw bitmaps; their height has no icon mask.
+        if (dib == 12)
+            return SetDimensions(BinaryPrimitives.ReadUInt16LittleEndian(header[4..]),
+                BinaryPrimitives.ReadUInt16LittleEndian(header[6..]), out dimensions);
+        long height = BinaryPrimitives.ReadInt32LittleEndian(header[8..]);
+        return SetDimensions(BinaryPrimitives.ReadInt32LittleEndian(header[4..]), Math.Abs(height), out dimensions);
     }
 
     private static bool ReadIcon(Stream stream, long start, long limit, out ImageDimensions dimensions) {
