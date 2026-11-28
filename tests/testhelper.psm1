@@ -4,12 +4,12 @@ function _GetSpectreRenderable {
     param(
         [Parameter(Mandatory)]
         [object] $RenderableObject,
-        [switch] $EscapeAnsi
+        [switch] $EscapeAnsi,
+        [Nullable[int]] $Width
     )
-    [PSTextMate.Utilities.SpectreRenderBridge]::RenderToString(
-        $RenderableObject,
-        $EscapeAnsi.IsPresent
-    )
+    $bridgeType = $RenderableObject.GetType().Assembly.GetType('PSTextMate.Utilities.SpectreRenderBridge', $true)
+    $renderMethod = $bridgeType.GetMethod('RenderToString')
+    $renderMethod.Invoke($null, @($RenderableObject, $EscapeAnsi.IsPresent, $Width))
 }
 
 

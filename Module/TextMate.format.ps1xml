@@ -1,9 +1,53 @@
-﻿<Configuration>
+<Configuration>
   <ViewDefinitions>
+    <View>
+      <Name>TextMateContent</Name>
+      <ViewSelectedBy>
+        <TypeName>PSTextMate.Core.TextContent</TypeName>
+      </ViewSelectedBy>
+      <CustomControl>
+        <CustomEntries>
+          <CustomEntry>
+            <CustomItem>
+              <ExpressionBinding>
+                <ScriptBlock>
+                  $availableWidth = 80
+                  try { $availableWidth = [Math]::Max(1, $Host.UI.RawUI.WindowSize.Width) } catch { }
+                  [PSTextMate.Core.OutputRenderer]::Format($_, $availableWidth)
+                </ScriptBlock>
+              </ExpressionBinding>
+            </CustomItem>
+          </CustomEntry>
+        </CustomEntries>
+      </CustomControl>
+    </View>
+    <View>
+      <Name>NativeHighlightedOutput</Name>
+      <ViewSelectedBy>
+        <TypeName>PSTextMate.NativeOutput</TypeName>
+        <TypeName>PSTextMate.Spectre.TextMateRenderable</TypeName>
+        <TypeName>PSTextMate.XenoAtom.TextMateVisual</TypeName>
+      </ViewSelectedBy>
+      <CustomControl>
+        <CustomEntries>
+          <CustomEntry>
+            <CustomItem>
+              <ExpressionBinding>
+                <ScriptBlock>
+                  $availableWidth = 80
+                  try { $availableWidth = [Math]::Max(1, $Host.UI.RawUI.WindowSize.Width) } catch { }
+                  [PSTextMate.Core.OutputRenderer]::Format($_, $availableWidth)
+                </ScriptBlock>
+              </ExpressionBinding>
+            </CustomItem>
+          </CustomEntry>
+        </CustomEntries>
+      </CustomControl>
+    </View>
     <View>
       <Name>TextMateGrammar</Name>
       <ViewSelectedBy>
-        <TypeName>TextMateSharp.Grammars.Language</TypeName>
+        <TypeName>PSTextMate.Core.Language</TypeName>
         </ViewSelectedBy>
         <TableControl>
           <TableHeaders>
@@ -42,9 +86,9 @@
         </TableControl>
     </View>
     <View>
-      <Name>HighlightedText</Name>
+      <Name>HighlightedDocument</Name>
       <ViewSelectedBy>
-        <TypeName>PSTextMate.Core.HighlightedText</TypeName>
+        <TypeName>PSTextMate.Core.HighlightedDocument</TypeName>
       </ViewSelectedBy>
       <CustomControl>
         <CustomEntries>
@@ -52,7 +96,9 @@
             <CustomItem>
               <ExpressionBinding>
                 <ScriptBlock>
-                  [PSTextMate.Utilities.Writer]::Write($_, $false, $true)
+                  $availableWidth = 80
+                  try { $availableWidth = [Math]::Max(1, $Host.UI.RawUI.WindowSize.Width) } catch { }
+                  [PSTextMate.Core.OutputRenderer]::Format($_, $availableWidth)
                 </ScriptBlock>
               </ExpressionBinding>
             </CustomItem>
@@ -60,5 +106,6 @@
         </CustomEntries>
       </CustomControl>
     </View>
+
   </ViewDefinitions>
 </Configuration>

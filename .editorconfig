@@ -161,10 +161,13 @@ dotnet_diagnostic.IDE0072.severity = none
 
 # Formatting / newline preferences
 # prefer Stroustrup
-csharp_new_line_before_open_brace = false
+csharp_new_line_before_open_brace = none
 csharp_new_line_before_else = true
 csharp_new_line_before_catch = true
 csharp_new_line_before_finally = true
+# Preserve compact auto-properties; statements still expand to separate lines.
+csharp_preserve_single_line_blocks = true
+csharp_preserve_single_line_statements = false
 csharp_prefer_braces = when_multiline
 # Indentation preferences
 csharp_indent_block_contents = true

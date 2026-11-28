@@ -1,38 +1,37 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <AssemblyName>PSTextMate</AssemblyName>
-        <TargetFramework>net8.0</TargetFramework>
+        <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
         <Version>0.3.0</Version>
         <ImplicitUsings>enable</ImplicitUsings>
-        <LangVersion>13.0</LangVersion>
+        <LangVersion>14.0</LangVersion>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
     <PropertyGroup>
         <EnableNETAnalyzers>true</EnableNETAnalyzers>
         <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
         <AnalysisLevel>latest-Recommended</AnalysisLevel>
     </PropertyGroup>
-    <ItemGroup>
-        <PackageReference Include="Spectre.Console" Version="0.54.0" PrivateAssets="all" />
-        <PackageReference Include="Markdig.Signed" Version="1.2.0" />
-        <PackageReference Include="SixLabors.ImageSharp" Version="4.0.0" />
-        <PackageReference Include="TextMateSharp" Version="2.0.3" />
-        <PackageReference Include="TextMateSharp.Grammars" Version="2.0.*" />
-        <PackageReference Include="Onigwrap" Version="1.0.*" />
-        <PackageReference Include="System.Management.Automation" Version="7.4.*" PrivateAssets="all" />
-        <ProjectReference Include="../PSTextMate.ALC/PSTextMate.ALC.csproj" />
-    </ItemGroup>
-    <ItemGroup>
-        <PackageReference Include="Roslynator.Analyzers" Version="4.*">
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-            <PrivateAssets>all</PrivateAssets>
-        </PackageReference>
-        <PackageReference Include="Roslynator.CodeFixes" Version="4.*">
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-            <PrivateAssets>all</PrivateAssets>
-        </PackageReference>
-        <InternalsVisibleTo Include="PSTextMate.InteractiveTests" />
-        <!-- https://learn.microsoft.com/en-us/nuget/concepts/auditing-packages#excluding-advisories -->
-        <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-447r-wph3-92pm" />
-    </ItemGroup>
+  <ItemGroup>
+    <None Update="LICENSE.Fullscreen.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Update="LICENSE.Unicode.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="themes/**/*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="grammars/**/*" Exclude="grammars/TOML.tmLanguage;grammars/KDL.tmLanguage.json;grammars/LICENSE.*.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Update="grammars/LICENSE.KDL.txt" TargetPath="LICENSE.KDL.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <EmbeddedResource Include="grammars/KDL.tmLanguage.json" LogicalName="PSTextMate.KDL.tmLanguage.json" />
+    <None Update="grammars/LICENSE.TOML.txt" TargetPath="LICENSE.TOML.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <EmbeddedResource Include="grammars/TOML.tmLanguage" LogicalName="PSTextMate.TOML.tmLanguage" />
+    <PackageReference Include="Tint" Version="[0.3.0]" />
+    <PackageReference Include="Tint.Grammars" Version="[0.3.0]" />
+    <PackageReference Include="Tint.Themes" Version="[0.3.0]" />
+    <PackageReference Include="System.Management.Automation" Version="7.6.9" PrivateAssets="all" />
+    <ProjectReference Include="../PSTextMate.ALC/PSTextMate.ALC.csproj" />
+    <InternalsVisibleTo Include="PSTextMate.Spectre" />
+    <InternalsVisibleTo Include="PSTextMate.XenoAtom" />
+    <InternalsVisibleTo Include="PSTextMate.Markdown" />
+    <InternalsVisibleTo Include="PSTextMate.Images" />
+    <InternalsVisibleTo Include="PSTextMate.InteractiveTests" />
+    <InternalsVisibleTo Include="PSTextMate.CoreTests" />
+  </ItemGroup>
 </Project>

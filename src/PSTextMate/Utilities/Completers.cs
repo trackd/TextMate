@@ -26,8 +26,10 @@ public sealed class LanguageCompleter : IArgumentCompleter {
         }
 
         bool Match(string token) {
-            if (pattern is null) return true; // no filter
-            if (pattern.IsMatch(token)) return true;
+            if (pattern is null)
+                return true; // no filter
+            if (pattern.IsMatch(token))
+                return true;
             // Also test without a leading dot to match bare extensions like "ps1" against ".ps1"
             return token.StartsWith('.') && pattern.IsMatch(token[1..]);
         }
@@ -38,7 +40,8 @@ public sealed class LanguageCompleter : IArgumentCompleter {
         if (!wantsExtensionsOnly) {
             // Languages first
             foreach (string lang in TextMateHelper.Languages ?? []) {
-                if (!Match(lang)) continue;
+                if (!Match(lang))
+                    continue;
                 results.Add(new CompletionResult(
                     completionText: lang,
                     listItemText: lang,
@@ -49,7 +52,8 @@ public sealed class LanguageCompleter : IArgumentCompleter {
 
         // Extensions (always include if requested or no leading '.')
         foreach (string ext in TextMateHelper.Extensions ?? []) {
-            if (!Match(ext)) continue;
+            if (!Match(ext))
+                continue;
             string completion = ext; // keep dot in completion
             string display = ext;
             results.Add(new CompletionResult(
@@ -81,7 +85,7 @@ public class TextMateLanguages : IValidateSetValuesGenerator {
     /// </summary>
     /// <param name="language">Language ID to validate</param>
     /// <returns>True if the language is supported, false otherwise</returns>
-    public static bool IsSupportedLanguage(string language) => TextMateHelper.Languages.Contains(language);
+    public static bool IsSupportedLanguage(string language) => GrammarCatalog.Instance.ByLanguage.ContainsKey(language);
 }
 /// <summary>
 /// Provides validation for file extensions in parameter validation attributes.
@@ -97,7 +101,7 @@ public class TextMateExtensions : IValidateSetValuesGenerator {
     /// </summary>
     /// <param name="extension">File extension to validate (with or without dot)</param>
     /// <returns>True if the extension is supported, false otherwise</returns>
-    public static bool IsSupportedExtension(string extension) => TextMateHelper.Extensions?.Contains(extension) == true;
+    public static bool IsSupportedExtension(string extension) => GrammarCatalog.Instance.ByExtension.ContainsKey(extension);
     /// <summary>
     /// Checks if a file has a supported extension.
     /// </summary>
@@ -105,7 +109,7 @@ public class TextMateExtensions : IValidateSetValuesGenerator {
     /// <returns>True if the file has a supported extension, false otherwise</returns>
     public static bool IsSupportedFile(string file) {
         string ext = Path.GetExtension(file);
-        return TextMateHelper.Extensions?.Contains(ext) == true;
+        return IsSupportedExtension(ext);
     }
 
 }

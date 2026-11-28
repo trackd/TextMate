@@ -1,0 +1,10 @@
+TOML TextMate bundle
+https://github.com/textmate/toml.tmbundle
+Revision: e82b64c1e86396220786846201e9aa3f0a2d9ca2
+Source: Syntaxes/TOML.tmLanguage (unmodified)
+License from README.mdown:
+
+Permission to copy, use, modify, sell and distribute this
+software is granted. This software is provided "as is" without
+express or implied warranty, and with no claim as to its
+suitability for any purpose.

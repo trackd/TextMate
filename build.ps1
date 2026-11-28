@@ -5,7 +5,9 @@ param(
     [switch]$SkipHelp,
     [switch]$SkipTests,
     [Switch]$BuildAndTestOnly,
-    [string]$Task
+    [string]$Task,
+    [ValidateSet('Spectre', 'Fullscreen', 'XenoAtom')]
+    [string[]]$Renderer = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -19,12 +21,12 @@ $buildparams = @{
     File          = (Get-Item (Join-Path $PSScriptRoot '*.build.ps1')).FullName
     Task          = 'All'
     Result        = 'Result'
-    Safe          = $true
+    Renderer      = $Renderer
 }
-if (-not (Get-Module -ListAvailable -Name InvokeBuild)) {
-    Install-Module -Name InvokeBuild -Scope CurrentUser -Force -AllowClobber
+if (-not (Get-Module -ListAvailable -Name InvokeBuild | Where-Object Version -EQ ([version]'5.14.23'))) {
+    Install-Module -Name InvokeBuild -RequiredVersion 5.14.23 -Scope CurrentUser -Force -AllowClobber
 }
-Import-Module InvokeBuild -ErrorAction Stop
+Import-Module InvokeBuild -RequiredVersion 5.14.23 -ErrorAction Stop
 
 if ($Task) {
     $buildparams.Task = $Task
@@ -39,7 +41,10 @@ if (-not $env:CI) {
         param($bp)
         Invoke-Build @bp
     }
-    pwsh -NoProfile -Command $sb -args $buildparams
+    & (Join-Path $PSHOME ($IsWindows ? 'pwsh.exe' : 'pwsh')) -NoProfile -Command $sb -args $buildparams
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
 }
 else {
     Invoke-Build @buildparams

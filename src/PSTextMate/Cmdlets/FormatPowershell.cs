@@ -6,7 +6,7 @@ namespace PSTextMate.Commands;
 /// </summary>
 [Cmdlet(VerbsCommon.Format, "PowerShell")]
 [Alias("fps")]
-[OutputType(typeof(HighlightedText))]
+[OutputType(typeof(HighlightedDocument), typeof(string))]
 public sealed class FormatPowerShellCmdlet : TextMateCmdletBase {
     protected override string FixedToken => "powershell";
 }

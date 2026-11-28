@@ -5,10 +5,12 @@
     Author               = 'trackd'
     CompanyName          = 'trackd'
     Copyright            = '(c) trackd. All rights reserved.'
-    Description          = 'A PowerShell module for syntax highlighting using TextMate grammars with built-in Spectre rendering.'
-    PowerShellVersion    = '7.4'
+    Description          = 'Managed TextMate syntax highlighting with built-in output and optional Spectre or XenoAtom rendering.'
+    PowerShellVersion    = '7.6'
     CompatiblePSEditions = 'Core'
     CmdletsToExport      = @(
+        'Add-TextMateLanguage'
+        'Add-TextMateTheme'
         'Format-TextMate'
         'Format-CSharp'
         'Format-Markdown'
@@ -26,13 +28,7 @@
         'page'
     )
     FormatsToProcess     = 'TextMate.format.ps1xml'
-    RequiredModules      = @(
-        @{
-            ModuleName     = 'PwshSpectreConsole'
-            ModuleVersion  = '2.6.3'
-            MaximumVersion = '2.99.99'
-        }
-    )
+    RequiredModules      = @()
     PrivateData          = @{
         PSData = @{
             Tags       = 'Windows', 'Linux', 'OSX', 'TextMate', 'Markdown', 'SyntaxHighlighting'

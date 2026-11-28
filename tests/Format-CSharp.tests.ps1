@@ -6,22 +6,21 @@ BeforeAll {
     Import-Module (Join-Path $PSScriptRoot 'testhelper.psm1') -Force
 }
 
-Describe 'Format-CSharp' {
+Describe 'Format-CSharp' -Tag 'Adapter' {
     It 'Formats a simple C# string and returns renderables' {
         $code = 'public class Foo { }'
-        $out = $code | Format-CSharp
+        $out = $code | Format-CSharp -OutputFormat Spectre
         $out | Should -Not -BeNullOrEmpty
-        $out.Renderables.Count | Should -BeGreaterThan 0
+        $out.LineCount | Should -BeGreaterThan 0
         $out.Language | Should -Be 'csharp'
         $out.ShowLineNumbers | Should -Be $false
-        $out.Page | Should -Be $false
         $rendered = _GetSpectreRenderable -RenderableObject $out -EscapeAnsi
         $rendered | Should -Match 'public class Foo'
     }
 
     It 'Formats a simple C# string' {
         $code = 'public class Foo { }'
-        $out = $code | Format-CSharp
+        $out = $code | Format-CSharp -OutputFormat Spectre
         $rendered = _GetSpectreRenderable -RenderableObject $out -EscapeAnsi
         $rendered | Should -Match 'public class Foo'
     }
@@ -30,10 +29,10 @@ Describe 'Format-CSharp' {
         $temp = Join-Path $PSScriptRoot 'temp.cs'
         'public class Temp { }' | Out-File -FilePath $temp -Encoding utf8
         try {
-            $out = Get-Item $temp | Format-CSharp
+            $out = Get-Item $temp | Format-CSharp -OutputFormat Spectre
             $out | Should -Not -BeNullOrEmpty
             $out.Language | Should -Be 'csharp'
-            $out.Renderables.Count | Should -BeGreaterThan 0
+            $out.LineCount | Should -BeGreaterThan 0
             $rendered = _GetSpectreRenderable -RenderableObject $out -EscapeAnsi
             $rendered | Should -Match 'public class Temp'
         } finally {
@@ -45,14 +44,14 @@ Describe 'Format-CSharp' {
         $s1 = "// a`npublic class A { }"
         $s2 = "// b`npublic class B { }"
 
-        $out = @($s1, $s2) | Format-CSharp
+        $out = @($s1, $s2) | Format-CSharp -OutputFormat Spectre
 
         $out.LineCount | Should -Be 4
     }
 
     It 'Renders generic type syntax without crashing' {
         $code = 'public class Repo<T> where T : class { }'
-        $out = $code | Format-CSharp
+        $out = $code | Format-CSharp -OutputFormat Spectre
         $rendered = _GetSpectreRenderable -RenderableObject $out -EscapeAnsi
         $rendered | Should -Match 'Repo'
         $rendered | Should -Match 'class'
@@ -60,7 +59,7 @@ Describe 'Format-CSharp' {
 
     It 'Renders using directives' {
         $code = "using System;`nusing System.Collections.Generic;"
-        $out = $code | Format-CSharp
+        $out = $code | Format-CSharp -OutputFormat Spectre
         $rendered = _GetSpectreRenderable -RenderableObject $out -EscapeAnsi
         $rendered | Should -Match 'System'
         $rendered | Should -Match 'Collections'
@@ -68,7 +67,7 @@ Describe 'Format-CSharp' {
 
     It 'Renders XML doc comments without losing content' {
         $code = "/// <summary>`n/// Does a thing.`n/// </summary>`npublic void DoThing() { }"
-        $out = $code | Format-CSharp
+        $out = $code | Format-CSharp -OutputFormat Spectre
         $rendered = _GetSpectreRenderable -RenderableObject $out -EscapeAnsi
         $rendered | Should -Match 'summary'
         $rendered | Should -Match 'DoThing'
@@ -76,7 +75,7 @@ Describe 'Format-CSharp' {
 
     It 'Renders LINQ expression syntax' {
         $code = 'var result = items.Where(x => x > 0).Select(x => x * 2).ToList();'
-        $out = $code | Format-CSharp
+        $out = $code | Format-CSharp -OutputFormat Spectre
         $rendered = _GetSpectreRenderable -RenderableObject $out -EscapeAnsi
         $rendered | Should -Match 'result'
         $rendered | Should -Match 'Where'
@@ -85,7 +84,7 @@ Describe 'Format-CSharp' {
 
     It 'Preserves interpolated string content' {
         $code = 'var msg = $"Hello {name}, you are {age} years old.";'
-        $out = $code | Format-CSharp
+        $out = $code | Format-CSharp -OutputFormat Spectre
         $rendered = _GetSpectreRenderable -RenderableObject $out -EscapeAnsi
         $rendered | Should -Match 'Hello'
         $rendered | Should -Match 'name'
@@ -94,7 +93,7 @@ Describe 'Format-CSharp' {
 
     It 'Renders interface and record declarations' {
         $code = "public interface IWidget { void Draw(); }`npublic record Point(int X, int Y);"
-        $out = $code | Format-CSharp
+        $out = $code | Format-CSharp -OutputFormat Spectre
         $rendered = _GetSpectreRenderable -RenderableObject $out -EscapeAnsi
         $rendered | Should -Match 'IWidget'
         $rendered | Should -Match 'Point'
@@ -102,17 +101,17 @@ Describe 'Format-CSharp' {
 
     It 'Preserves unicode characters inside a string literal' {
         $code = 'var s = "emoji: \U0001F680";'
-        $out = $code | Format-CSharp
+        $out = $code | Format-CSharp -OutputFormat Spectre
         $rendered = _GetSpectreRenderable -RenderableObject $out -EscapeAnsi
         $rendered | Should -Match 'emoji'
     }
 
-    It 'Line count matches source line count from file' {
+    It 'Counts the final empty line when a source file ends with a newline' {
         $temp = Join-Path $PSScriptRoot 'temp_count.cs'
         "// line 1`npublic class X { }`n// line 3" | Out-File -FilePath $temp -Encoding utf8
         try {
-            $out = Get-Item $temp | Format-CSharp
-            $out.LineCount | Should -Be 3
+            $out = Get-Item $temp | Format-CSharp -OutputFormat Spectre
+            $out.LineCount | Should -Be 4
         } finally {
             Remove-Item -Force -ErrorAction SilentlyContinue $temp
         }

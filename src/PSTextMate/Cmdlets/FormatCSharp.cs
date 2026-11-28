@@ -6,7 +6,7 @@ namespace PSTextMate.Commands;
 /// </summary>
 [Cmdlet(VerbsCommon.Format, "CSharp")]
 [Alias("fcs")]
-[OutputType(typeof(HighlightedText))]
+[OutputType(typeof(HighlightedDocument), typeof(string))]
 public sealed class FormatCSharpCmdlet : TextMateCmdletBase {
     protected override string FixedToken => "csharp";
 }

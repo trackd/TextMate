@@ -9,34 +9,9 @@ public static class TextMateHelper {
     /// <summary>
     /// Array of supported file extensions (e.g., ".ps1", ".md", ".cs").
     /// </summary>
-    public static readonly string[] Extensions;
-    /// <summary>
-    /// Array of supported TextMate language identifiers (e.g., "powershell", "markdown", "csharp").
-    /// </summary>
-    public static readonly string[] Languages;
-    /// <summary>
-    /// List of all available language definitions with metadata.
-    /// </summary>
-    public static readonly List<Language> AvailableLanguages;
-    static TextMateHelper() {
-        try {
-            RegistryOptions _registryOptions = new(ThemeName.DarkPlus);
-            AvailableLanguages = _registryOptions.GetAvailableLanguages();
-
-            // Get all the extensions and languages from the available languages
-            Extensions = [.. AvailableLanguages
-                .Where(x => x.Extensions is not null)
-                .SelectMany(x => x.Extensions)];
-
-            Languages = [.. AvailableLanguages
-                .Where(x => x.Id is not null)
-                .Select(x => x.Id)];
-        }
-        catch (Exception ex) {
-            throw new TypeInitializationException(nameof(TextMateHelper), ex);
-        }
-    }
-
+    public static string[] Extensions => [.. GrammarCatalog.Instance.ByExtension.Keys.Order(StringComparer.OrdinalIgnoreCase)];
+    public static string[] Languages => [.. GrammarCatalog.Instance.ByLanguage.Keys.Order(StringComparer.OrdinalIgnoreCase)];
+    public static List<Language> AvailableLanguages => [.. GrammarCatalog.Instance.Languages];
     internal static string[] SplitToLines(string input) {
         if (input.Length == 0) {
             return [string.Empty];
@@ -82,12 +57,7 @@ public static class TextMateHelper {
             int breakIndex = lineStart + relativeBreak;
             destination.Add(new string(span[lineStart..breakIndex]));
 
-            if (span[breakIndex] == '\r' && breakIndex + 1 < span.Length && span[breakIndex + 1] == '\n') {
-                lineStart = breakIndex + 2;
-            }
-            else {
-                lineStart = breakIndex + 1;
-            }
+            lineStart = span[breakIndex] == '\r' && breakIndex + 1 < span.Length && span[breakIndex + 1] == '\n' ? breakIndex + 2 : breakIndex + 1;
 
             if (lineStart == span.Length) {
                 destination.Add(string.Empty);

@@ -7,7 +7,7 @@ namespace PSTextMate.Commands;
 /// </summary>
 [Cmdlet(VerbsCommon.Format, "TextMate", DefaultParameterSetName = "Default")]
 [Alias("Show-TextMate", "ftm")]
-[OutputType(typeof(HighlightedText))]
+[OutputType(typeof(HighlightedDocument), typeof(string))]
 public sealed class FormatTextMateCmdlet : TextMateCmdletBase {
     /// <summary>
     /// TextMate language ID for syntax highlighting (e.g., 'powershell', 'csharp', 'python').

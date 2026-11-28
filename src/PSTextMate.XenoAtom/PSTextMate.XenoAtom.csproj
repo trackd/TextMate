@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../PSTextMate/PSTextMate.csproj" />
+    <PackageReference Include="XenoAtom.Terminal.UI" Version="3.10.0" />
+  </ItemGroup>
+</Project>
