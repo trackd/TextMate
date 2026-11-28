@@ -6,6 +6,17 @@ namespace PSTextMate.InteractiveTests;
 
 public sealed class NativeOutputTests {
     [Fact]
+    public void Spectre_PlainCaptureOmitsAllControlSequencesAndPreservesTokenBoundaries() {
+        const string source = "public class Foo { }";
+        HighlightedDocument document = SyntaxHighlighter.Highlight(source, "csharp");
+        object output = new Spectre.Renderer().Render(document, default);
+        string plain = Utilities.SpectreRenderBridge.RenderToString(output, escapeAnsi: true, width: 80);
+        Assert.Equal(source, plain);
+        string ansi = Utilities.SpectreRenderBridge.RenderToString(output, width: 80);
+        Assert.Contains("\u001b[", ansi);
+    }
+
+    [Fact]
     public void Spectre_ProducesNativeRenderableWithoutInterpretingMarkup() {
         HighlightedDocument document = SyntaxHighlighter.Highlight("Write-Output '[red]🦊[/]'", lineNumbers: true);
         object output = new Spectre.Renderer().Render(document, default);

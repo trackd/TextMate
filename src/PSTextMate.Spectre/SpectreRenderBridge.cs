@@ -19,6 +19,9 @@ public static class SpectreRenderBridge {
             ColorSystem = ColorSystemSupport.TrueColor,
             Interactive = InteractionSupport.No
         });
+        // CI detection can override the requested ANSI setting during console creation.
+        // Captures must honor the caller's format regardless of the host environment.
+        console.Profile.Capabilities.Ansi = !escapeAnsi;
         console.Profile.Capabilities.Links = !escapeAnsi;
         if (width is > 0)
             console.Profile.Width = width.Value;
