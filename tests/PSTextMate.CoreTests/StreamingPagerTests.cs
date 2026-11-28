@@ -146,6 +146,8 @@ public sealed class StreamingPagerTests {
         var session = new StreamingPager(CancellationToken.None, terminal);
         try {
             Assert.True(SpinWait.SpinUntil(() => Volatile.Read(ref terminal.Ends) == 1, TimeSpan.FromSeconds(5)));
+            // End runs during terminal cleanup, before the worker publishes its failure.
+            Assert.Throws<IOException>(() => session.Complete());
             Assert.Throws<IOException>(() => session.Append("late"));
         }
         finally {
