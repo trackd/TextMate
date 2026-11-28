@@ -129,11 +129,12 @@ public sealed class OutputParityTests {
             Array.Fill(styles, range.Style, range.Start, range.Length);
         var text = new StringBuilder();
         var outputStyles = new List<NeutralStyle>();
-        int digits = document.LineCount.ToString(CultureInfo.InvariantCulture).Length;
+        int digits = document.LineNumberTotal.ToString(CultureInfo.InvariantCulture).Length;
         for (int index = 0; index < document.LineCount; index++) {
             HighlightedLine line = document.Lines.Span[index];
             if (document.ShowLineNumbers) {
-                string gutter = (index + 1).ToString(CultureInfo.InvariantCulture).PadLeft(digits) + " │ ";
+                int number = document.GetLineNumber(index);
+                string gutter = (number == 0 ? string.Empty : number.ToString(CultureInfo.InvariantCulture)).PadLeft(digits) + " │ ";
                 text.Append(gutter);
                 outputStyles.AddRange(Enumerable.Repeat(Plain, gutter.Length));
             }

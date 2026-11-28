@@ -26,7 +26,7 @@ public static partial class TextRenderer {
         for (int lineIndex = firstLine; lineIndex < lastLine; lineIndex++) {
             HighlightedLine line = lines[lineIndex];
             if (document.ShowLineNumbers) {
-                LineNumberGutter.Write(writer, lineIndex + 1, document.LineCount);
+                LineNumberGutter.Write(writer, document.GetLineNumber(lineIndex), document.LineNumberTotal);
             }
             int cursor = line.Start;
             for (int index = line.FirstRange; index < line.FirstRange + line.RangeCount; index++) {

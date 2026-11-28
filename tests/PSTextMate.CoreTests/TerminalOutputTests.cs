@@ -11,7 +11,7 @@ public sealed class TerminalOutputTests {
         Assert.Equal(input, result.Source);
         Assert.Equal("redplain", result.Text);
         StyledRange[] ranges = result.Ranges.ToArray();
-        Assert.Equal(new TextStyle(0x0c2238, 0xff0000, TextDecoration.Bold), ranges[0].Style);
+        Assert.Equal(new TextStyle(TextColor.FromRgb(0x0c2238), TextColor.FromPalette(196), TextDecoration.Bold), ranges[0].Style);
         Assert.Equal(new TextStyle(-1, -1, TextDecoration.None), ranges[1].Style);
         Assert.Equal(3, ranges[0].Length);
         Assert.DoesNotContain("2J", result.ToAnsi());
@@ -34,7 +34,8 @@ public sealed class TerminalOutputTests {
         };
         HighlightedDocument result = VT.Parse(sequence + "x");
         Assert.Equal("x", result.Text);
-        Assert.Equal(expected, result.Ranges.Span[0].Style.Foreground);
+        Assert.Equal(expected, result.Ranges.Span[0].Style.ForegroundColor.Rgb);
+        Assert.Equal(scenario.StartsWith("Colon", StringComparison.Ordinal), !result.Ranges.Span[0].Style.ForegroundColor.IsPalette);
     }
 
     [Fact]
@@ -68,7 +69,7 @@ public sealed class TerminalOutputTests {
         var view = new TextMateView(document);
         HighlightedDocument narrow = view.Layout(8);
         Assert.True(narrow.LineCount > document.LineCount);
-        Assert.All(narrow.Ranges.ToArray(), range => Assert.Equal(0x008000, range.Style.Foreground));
+        Assert.All(narrow.Ranges.ToArray(), range => Assert.Equal(TextColor.FromPalette(2), range.Style.ForegroundColor));
         Assert.Equal("first\nsecond long line", view.Layout(80).Text);
     }
 

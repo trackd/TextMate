@@ -202,7 +202,7 @@ internal sealed partial class PagerFrame : IDisposable {
         int available = state.Width;
         if (document.ShowLineNumbers) {
             Span<char> gutter = stackalloc char[13];
-            int length = LineNumberGutter.Format(gutter, index + 1, document.LineCount);
+            int length = LineNumberGutter.Format(gutter, document.GetLineNumber(index), document.LineNumberTotal);
             int fit = TerminalCells.Fit(gutter[..length], available);
             output.Write(gutter[..fit]);
             available -= TerminalCells.Measure(gutter[..fit]);

@@ -5,7 +5,7 @@ public static partial class TextRenderer {
         TextStyle style, int firstLine, int lastLine) {
         HighlightedLine line = document.Lines.Span[row];
         int end = start + length;
-        int gutter = document.ShowLineNumbers ? LineNumberGutter.Digits(document.LineCount) + 3 : 0;
+        int gutter = document.ShowLineNumbers ? LineNumberGutter.Width(document.LineNumberTotal) : 0;
         while (start < end) {
             int next = end;
             int coveredEnd = -1;
@@ -41,18 +41,21 @@ public static partial class TextRenderer {
             HighlightedLine line = document.Lines.Span[row];
             int endColumn = newline ? 0 : TerminalCells.Measure(document.Text.AsSpan(line.Start, line.Length));
             if (!newline && document.ShowLineNumbers)
-                endColumn += LineNumberGutter.Digits(document.LineCount) + 3;
+                endColumn += LineNumberGutter.Width(document.LineNumberTotal);
+            TerminalImage image = document.Images.Span[index].Image;
+            bool sixel = image.Protocol == TerminalImageProtocol.Sixel;
             writer.Write('\r');
             writer.Write(VT.SaveCursor);
-            writer.Write(VT.SaveSixelModes);
+            if (sixel)
+                writer.Write(VT.SaveSixelModes);
             try {
                 VT.MoveUp(writer, bounds.Height - (newline ? 0 : 1));
                 VT.MoveRight(writer, bounds.Column);
-                writer.Write(VT.InlineSixelModes);
-                writer.Write(document.Images.Span[index].Image.Sixel.Span);
+                VT.WriteImage(writer, image);
             }
             finally {
-                writer.Write(VT.RestoreSixelModes);
+                if (sixel)
+                    writer.Write(VT.RestoreSixelModes);
                 writer.Write(VT.RestoreCursor);
                 VT.MoveRight(writer, endColumn);
                 writer.Write(VT.Reset);

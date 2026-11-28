@@ -2,10 +2,21 @@ namespace PSTextMate.Core;
 
 /// <summary>Converts captured terminal output into text and styles without executing terminal commands.</summary>
 public static partial class VT {
-    /// <summary>Parses SGR colors/decorations and OSC 8 links. Other terminal commands are discarded.</summary>
+    /// <summary>
+    /// Parses SGR colors/decorations, OSC 8 links and inline images (Sixel, Kitty, iTerm2 and Good Image Protocol
+    /// placements). Images keep their payload and reserve their cells. Other terminal commands are discarded.
+    /// </summary>
     public static HighlightedDocument Parse(string text) {
         ArgumentNullException.ThrowIfNull(text);
-        var parser = new VTParser();
+        var parser = new VTParser(cells: static () => TerminalImageParser.CellMetrics.Current());
+        parser.Append(text);
+        return parser.Build(text);
+    }
+
+    /// <param name="graphics">Cell metrics that convert image pixel sizes to cells.</param>
+    public static HighlightedDocument Parse(string text, TerminalGraphics graphics) {
+        ArgumentNullException.ThrowIfNull(text);
+        var parser = new VTParser(cells: () => TerminalImageParser.CellMetrics.From(graphics));
         parser.Append(text);
         return parser.Build(text);
     }
@@ -14,10 +25,34 @@ public static partial class VT {
 /// <summary>Span-based VT decoder for captured output, distinct from literal source highlighting.</summary>
 internal sealed class VTParser {
     private readonly PresentedTextBuilder _builder = new();
+    private readonly Func<TerminalImageParser.CellMetrics>? _cells;
     private int _column;
     internal TextStyle CurrentStyle { get; private set; } = PresentedTextBuilder.Plain;
-    internal VTParser(TextStyle? initialStyle = null) {
+    internal VTParser(TextStyle? initialStyle = null, Func<TerminalImageParser.CellMetrics>? cells = null) {
         CurrentStyle = initialStyle ?? TextStyle.Plain;
+        _cells = cells;
+    }
+
+    /// <summary>
+    /// Reserves the image's cells at the cursor, like the terminal that would draw it, and leaves the cursor to the
+    /// right of its last row. Returns the number of following characters that only move the cursor across the image.
+    /// </summary>
+    private int PlaceImage(TerminalImage image, ReadOnlySpan<char> following) {
+        int column = _column;
+        _builder.AddImage(_builder.Length, image);
+        _builder.AppendRepeated(' ', image.Width, PresentedTextBuilder.Plain);
+        for (int row = 1; row < image.Height; row++) {
+            _builder.NewLine();
+            _builder.AppendRepeated(' ', column + image.Width, PresentedTextBuilder.Plain);
+        }
+        _column = column + image.Width;
+        // Some encoders follow a placement with CR LF per image row so the cursor ends below it; those rows are reserved.
+        int skipped = 0;
+        for (int row = 1; row < image.Height && following[skipped..].StartsWith("\r\n", StringComparison.Ordinal); row++)
+            skipped += 2;
+        if (skipped > 0 && following[skipped..].StartsWith("\r", StringComparison.Ordinal) && !following[skipped..].StartsWith("\r\n", StringComparison.Ordinal))
+            skipped++;
+        return skipped;
     }
 
     internal void Append(HighlightedDocument document) {
@@ -40,6 +75,12 @@ internal sealed class VTParser {
             if (cursor == text.Length)
                 break;
             char control = text[cursor++];
+            if (control == '\u001b' && _cells is not null && TerminalImageParser.MayStartImage(text[(cursor - 1)..])
+                && TerminalImageParser.TryRead(text[(cursor - 1)..], _cells(), out int consumed, out TerminalImage? image)) {
+                cursor += consumed - 1;
+                cursor += PlaceImage(image!, text[cursor..]);
+                continue;
+            }
             if (control == '\t') {
                 int spaces = 8 - (_column % 8);
                 _builder.AppendRepeated(' ', spaces, CurrentStyle);
@@ -242,18 +283,6 @@ internal sealed class VTParser {
         }
     }
 
-    private static int Palette(int index) {
-        ReadOnlySpan<int> basic = [0x000000, 0x800000, 0x008000, 0x808000, 0x000080, 0x800080, 0x008080, 0xc0c0c0,
-            0x808080, 0xff0000, 0x00ff00, 0xffff00, 0x0000ff, 0xff00ff, 0x00ffff, 0xffffff];
-        if (index < 16)
-            return basic[index];
-        if (index >= 232) {
-            int gray = 8 + ((index - 232) * 10);
-            return gray * 0x010101;
-        }
-        index -= 16;
-        return (Component(index / 36) << 16) | (Component(index / 6 % 6) << 8) | Component(index % 6);
-    }
-
-    private static int Component(int value) => value == 0 ? 0 : 55 + (value * 40);
+    // Palette colors stay palette references, so captured output keeps the user's terminal theme.
+    private static int Palette(int index) => ColorValue.Palette(index);
 }

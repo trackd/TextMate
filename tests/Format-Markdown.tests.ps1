@@ -7,7 +7,7 @@ BeforeAll {
 }
 
 
-Describe 'Format-Markdown' {
+Describe 'Format-Markdown' -Tag 'Adapter' {
     It 'Formats Markdown and returns renderables' {
         $md = "# Title`n`nSome text"
         $out = $md | Format-Markdown -OutputFormat Spectre

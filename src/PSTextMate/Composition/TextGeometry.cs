@@ -156,6 +156,7 @@ public static class PanelFrame {
 }
 
 /// <summary>One line-number gutter implementation for native renderers, composed output and the pager.</summary>
+/// <remarks>A number of 0 draws the gutter of a wrapped continuation row: separator, no number.</remarks>
 public static class LineNumberGutter {
     public static int Digits(int total) {
         ArgumentOutOfRangeException.ThrowIfLessThan(total, 1);
@@ -169,35 +170,36 @@ public static class LineNumberGutter {
 
     public static int Width(int total) => Digits(total) + 3;
 
+    private static int FormatNumber(Span<char> buffer, int number) {
+        ArgumentOutOfRangeException.ThrowIfNegative(number);
+        if (number == 0)
+            return 0;
+        number.TryFormat(buffer, out int written, provider: CultureInfo.InvariantCulture);
+        return written;
+    }
+
     public static string Format(int number, int total) {
-        ArgumentOutOfRangeException.ThrowIfLessThan(number, 1);
-        int digits = Digits(Math.Max(number, total));
-        return string.Create(digits + 3, (number, digits), static (destination, state) => {
-            destination.Fill(' ');
-            Span<char> numberBuffer = stackalloc char[10];
-            state.number.TryFormat(numberBuffer, out int written, provider: CultureInfo.InvariantCulture);
-            numberBuffer[..written].CopyTo(destination[(state.digits - written)..]);
-            destination[state.digits + 1] = '│';
-        });
+        int digits = Digits(Math.Max(Math.Max(1, number), total));
+        Span<char> destination = stackalloc char[digits + 3];
+        Format(destination, number, total);
+        return destination.ToString();
     }
 
     public static void Write(TextWriter writer, int number, int total) {
         ArgumentNullException.ThrowIfNull(writer);
-        ArgumentOutOfRangeException.ThrowIfLessThan(number, 1);
         Span<char> buffer = stackalloc char[10];
-        number.TryFormat(buffer, out int written, provider: CultureInfo.InvariantCulture);
-        TextGeometry.WritePadding(writer, Digits(Math.Max(number, total)) - written);
+        int written = FormatNumber(buffer, number);
+        TextGeometry.WritePadding(writer, Digits(Math.Max(Math.Max(1, number), total)) - written);
         writer.Write(buffer[..written]);
         writer.Write(" │ ");
     }
 
     public static int Format(Span<char> destination, int number, int total) {
-        ArgumentOutOfRangeException.ThrowIfLessThan(number, 1);
-        int digits = Digits(Math.Max(number, total));
+        int digits = Digits(Math.Max(Math.Max(1, number), total));
         if (destination.Length < digits + 3)
             throw new ArgumentException("The gutter buffer is too small.", nameof(destination));
         Span<char> numberBuffer = stackalloc char[10];
-        number.TryFormat(numberBuffer, out int written, provider: CultureInfo.InvariantCulture);
+        int written = FormatNumber(numberBuffer, number);
         destination[..(digits + 3)].Fill(' ');
         numberBuffer[..written].CopyTo(destination[(digits - written)..]);
         destination[digits + 1] = '│';
@@ -206,7 +208,7 @@ public static class LineNumberGutter {
 
     internal static void Append(StringBuilder builder, int number, int total) {
         Span<char> buffer = stackalloc char[10];
-        number.TryFormat(buffer, out int written, provider: CultureInfo.InvariantCulture);
-        builder.Append(' ', Digits(Math.Max(number, total)) - written).Append(buffer[..written]).Append(" │ ");
+        int written = FormatNumber(buffer, number);
+        builder.Append(' ', Digits(Math.Max(Math.Max(1, number), total)) - written).Append(buffer[..written]).Append(" │ ");
     }
 }

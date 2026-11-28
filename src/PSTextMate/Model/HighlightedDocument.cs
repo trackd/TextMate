@@ -24,8 +24,21 @@ public sealed class HighlightedDocument {
     internal RendererOptions LayoutOptions { get; private set; }
     internal bool IsPresented { get; }
     internal TextContent? Content { get; private set; }
+    // Presented line -> source line number; 0 marks a wrapped continuation. Null maps lines one-to-one.
+    private readonly int[]? _lineNumbers;
+    private readonly int _lineNumberTotal;
 
-    internal HighlightedDocument(string source, string language, string theme, bool lineNumbers, StyledRange[] ranges, HighlightedLine[] lines, long limitExceededCount, string? text = null, HighlightingSnapshot? catalog = null, PlacedImage[]? images = null) {
+    /// <summary>The source line number shown in the gutter of a presented line, or 0 for a wrapped continuation row.</summary>
+    public int GetLineNumber(int line) => _lineNumbers is null ? line + 1 : _lineNumbers[line];
+
+    /// <summary>The largest line number shown in the gutter, which sizes it.</summary>
+    public int LineNumberTotal => _lineNumbers is null ? Math.Max(1, LineCount) : _lineNumberTotal;
+
+    internal HighlightedDocument(string source, string language, string theme, bool lineNumbers, StyledRange[] ranges, HighlightedLine[] lines, long limitExceededCount, string? text = null, HighlightingSnapshot? catalog = null, PlacedImage[]? images = null, int[]? sourceLineNumbers = null) {
+        if (sourceLineNumbers is not null && sourceLineNumbers.Length == lines.Length) {
+            _lineNumbers = sourceLineNumbers;
+            _lineNumberTotal = Math.Max(1, sourceLineNumbers.Max());
+        }
         Catalog = catalog ?? HighlightingExtensions.Snapshot;
         Source = source;
         Text = text ?? source;
@@ -39,8 +52,8 @@ public sealed class HighlightedDocument {
         LimitExceededCount = limitExceededCount;
     }
 
-    internal HighlightedDocument WithPresentation(string text, StyledRange[] ranges, HighlightedLine[] lines, PlacedImage[]? images = null) =>
-        new(Source, Language, Theme, ShowLineNumbers, ranges, lines, LimitExceededCount, text, Catalog, images);
+    internal HighlightedDocument WithPresentation(string text, StyledRange[] ranges, HighlightedLine[] lines, PlacedImage[]? images = null, int[]? lineNumbers = null) =>
+        new(Source, Language, Theme, ShowLineNumbers, ranges, lines, LimitExceededCount, text, Catalog, images, lineNumbers);
 
     private HighlightedDocument(HighlightedDocument original, string? text = null, bool presented = true, bool? lineNumbers = null) {
         LayoutSource = original.LayoutSource;
@@ -57,6 +70,8 @@ public sealed class HighlightedDocument {
         LimitExceededCount = original.LimitExceededCount;
         IsPresented = presented;
         Content = original.Content;
+        _lineNumbers = original._lineNumbers;
+        _lineNumberTotal = original._lineNumberTotal;
     }
 
     internal HighlightedDocument WithIdentityPresentation() => new(this);
@@ -90,7 +105,7 @@ public sealed class HighlightedDocument {
         }
         int column = TerminalCells.Measure(Text.AsSpan(lines[low].Start, start - lines[low].Start));
         if (ShowLineNumbers)
-            column += LineNumberGutter.Digits(LineCount) + 3;
+            column += LineNumberGutter.Width(LineNumberTotal);
         return new(column, low, width, height);
     }
 

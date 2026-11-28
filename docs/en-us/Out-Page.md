@@ -137,6 +137,10 @@ This cmdlet writes to the interactive pager and does not emit pipeline output.
 
 Use `q` or `Esc` to exit the pager. Arrow keys, PageUp/PageDown, Spacebar, Home, and End are supported for navigation.
 
+Quitting before the input ends stops the upstream commands, as `Select-Object -First` does; the statements after the pipeline still run. Ctrl+C stops the whole pipeline as usual.
+
+While input streams into the pager, the pager owns the terminal. Anything else that writes to the console meanwhile, such as error records, warnings or `Write-Progress` from upstream commands, is drawn over the pager. Silence or redirect those streams, for example `Get-ChildItem -Recurse -ErrorAction SilentlyContinue | Out-Page`, or collect the output first.
+
 ## RELATED LINKS
 
 See also `Format-TextMate`, `Format-CSharp`, `Format-Markdown`, and `Format-PowerShell`.

@@ -13,7 +13,8 @@ public interface IImagePresentation {
 
 /// <summary>Applies content decisions once, before conversion to a rendering framework.</summary>
 public static class DocumentPresentation {
-    internal static TerminalGraphics GetTerminalGraphics() => Images.Value?.GetTerminalGraphics() ?? default;
+    // Cached by TerminalCapabilities; reading it never performs terminal I/O.
+    internal static TerminalGraphics GetTerminalGraphics() => TerminalCapabilities.Current.Graphics;
     private static readonly Lazy<IMarkdownPresentation> Markdown = new(static () =>
         OutputRenderer.LoadPresentation<IMarkdownPresentation>("Markdown"));
     private static readonly Lazy<IImagePresentation?> Images = new(static () =>
@@ -42,7 +43,7 @@ public static class DocumentPresentation {
             }
         }
         bool needsNormalization = document.Text.AsSpan().IndexOfAny('\t', '\r') >= 0 || TerminalText.HasControls(document.Text);
-        int gutter = document.ShowLineNumbers ? document.LineCount.ToString(CultureInfo.InvariantCulture).Length + 3 : 0;
+        int gutter = document.ShowLineNumbers ? LineNumberGutter.Width(document.LineCount) : 0;
         int contentWidth = Math.Max(1, width - gutter);
         bool wrap = false;
         foreach (HighlightedLine line in document.Lines.Span) {
@@ -71,37 +72,36 @@ public static class DocumentPresentation {
         }
         if (!wrap)
             return expanded.WithLayoutContext(document, options);
-        while (true) {
-            var folded = new PresentedTextBuilder();
-            for (int index = 0; index < expanded.LineCount; index++) {
-                HighlightedLine line = expanded.Lines.Span[index];
-                int cursor = line.Start;
-                int end = cursor + line.Length;
-                while (cursor < end) {
-                    int count = TerminalCells.Fit(expanded.Text.AsSpan(cursor, end - cursor), contentWidth);
-                    if (count == 0)
-                        count = TerminalCells.NextClusterLength(expanded.Text.AsSpan(cursor));
-                    if (cursor + count < end) {
-                        ReadOnlySpan<char> candidate = expanded.Text.AsSpan(cursor, count);
-                        int space = candidate.LastIndexOf(' ');
-                        if (space > 0 && candidate[..space].IndexOfAnyExcept(' ') >= 0)
-                            count = space + 1;
-                    }
-                    folded.AppendSlice(expanded, cursor, count);
-                    cursor += count;
-                    if (cursor < end)
-                        folded.NewLine();
+        // Continuation rows keep the gutter of their source line blank, so numbers always identify source lines
+        // and the gutter width depends only on the source line count.
+        var folded = new PresentedTextBuilder();
+        var lineNumbers = new List<int>(expanded.LineCount);
+        for (int index = 0; index < expanded.LineCount; index++) {
+            HighlightedLine line = expanded.Lines.Span[index];
+            int cursor = line.Start;
+            int end = cursor + line.Length;
+            lineNumbers.Add(index + 1);
+            while (cursor < end) {
+                int count = TerminalCells.Fit(expanded.Text.AsSpan(cursor, end - cursor), contentWidth);
+                if (count == 0)
+                    count = TerminalCells.NextClusterLength(expanded.Text.AsSpan(cursor));
+                if (cursor + count < end) {
+                    ReadOnlySpan<char> candidate = expanded.Text.AsSpan(cursor, count);
+                    int space = candidate.LastIndexOf(' ');
+                    if (space > 0 && candidate[..space].IndexOfAnyExcept(' ') >= 0)
+                        count = space + 1;
                 }
-                int next = index + 1 < expanded.LineCount ? expanded.Lines.Span[index + 1].Start : expanded.Text.Length;
-                folded.Append(expanded.Text.AsSpan(end, next - end), PresentedTextBuilder.Plain);
+                folded.AppendSlice(expanded, cursor, count);
+                cursor += count;
+                if (cursor < end) {
+                    folded.NewLine();
+                    lineNumbers.Add(0);
+                }
             }
-            HighlightedDocument result = folded.Build(document);
-            int actualGutter = document.ShowLineNumbers ? result.LineCount.ToString(CultureInfo.InvariantCulture).Length + 3 : 0;
-            int actualWidth = Math.Max(1, width - actualGutter);
-            if (actualWidth >= contentWidth)
-                return result.WithLayoutContext(document, options);
-            contentWidth = actualWidth;
+            int next = index + 1 < expanded.LineCount ? expanded.Lines.Span[index + 1].Start : expanded.Text.Length;
+            folded.Append(expanded.Text.AsSpan(end, next - end), PresentedTextBuilder.Plain);
         }
+        return folded.Build(document, document.ShowLineNumbers ? [.. lineNumbers] : null).WithLayoutContext(document, options);
     }
 }
 

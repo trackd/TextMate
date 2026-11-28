@@ -28,7 +28,7 @@ public static class HtmlRenderer {
         int lineIndex = 0;
         foreach (HighlightedLine line in document.Lines.Span) {
             if (document.ShowLineNumbers) {
-                LineNumberGutter.Write(writer, lineIndex + 1, document.LineCount);
+                LineNumberGutter.Write(writer, document.GetLineNumber(lineIndex), document.LineNumberTotal);
             }
             int cursor = line.Start;
             foreach (StyledRange range in ranges.Slice(line.FirstRange, line.RangeCount)) {
@@ -91,7 +91,8 @@ public static class HtmlRenderer {
         return Uri.TryCreate(link, UriKind.RelativeOrAbsolute, out Uri? uri) && (!uri.IsAbsoluteUri || uri.Scheme is "http" or "https" or "mailto" or "file");
     }
 
-    private static void Color(TextWriter writer, string property, int rgb) {
+    private static void Color(TextWriter writer, string property, int value) {
+        int rgb = ColorValue.ToRgb(value);
         if (rgb < 0)
             return;
         Span<char> hex = stackalloc char[6];

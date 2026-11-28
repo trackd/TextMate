@@ -33,7 +33,11 @@
           <CustomEntry>
             <CustomItem>
               <ExpressionBinding>
-                <ScriptBlock>[PSTextMate.Core.OutputRenderer]::Format($_)</ScriptBlock>
+                <ScriptBlock>
+                  $availableWidth = 80
+                  try { $availableWidth = [Math]::Max(1, $Host.UI.RawUI.WindowSize.Width) } catch { }
+                  [PSTextMate.Core.OutputRenderer]::Format($_, $availableWidth)
+                </ScriptBlock>
               </ExpressionBinding>
             </CustomItem>
           </CustomEntry>
@@ -92,7 +96,9 @@
             <CustomItem>
               <ExpressionBinding>
                 <ScriptBlock>
-                  [PSTextMate.Core.TextRenderer]::Format($_)
+                  $availableWidth = 80
+                  try { $availableWidth = [Math]::Max(1, $Host.UI.RawUI.WindowSize.Width) } catch { }
+                  [PSTextMate.Core.OutputRenderer]::Format($_, $availableWidth)
                 </ScriptBlock>
               </ExpressionBinding>
             </CustomItem>
@@ -100,24 +106,6 @@
         </CustomEntries>
       </CustomControl>
     </View>
-    <View>
-      <Name>HighlightedText</Name>
-      <ViewSelectedBy>
-        <TypeName>PSTextMate.Core.HighlightedText</TypeName>
-      </ViewSelectedBy>
-      <CustomControl>
-        <CustomEntries>
-          <CustomEntry>
-            <CustomItem>
-              <ExpressionBinding>
-                <ScriptBlock>
-                  $_.Write()
-                </ScriptBlock>
-              </ExpressionBinding>
-            </CustomItem>
-          </CustomEntry>
-        </CustomEntries>
-      </CustomControl>
-    </View>
+
   </ViewDefinitions>
 </Configuration>

@@ -10,7 +10,7 @@ internal sealed partial class PagerSpool {
     private TerminalImage? _cachedImage;
     public int ImageCount => Volatile.Read(ref _imageCount);
     internal string? ImageHistoryPath => _images?.Name;
-    internal long CachedImageBytes => (_cachedImage?.Sixel.Length ?? 0) * 2L;
+    internal long CachedImageBytes => (_cachedImage?.Payload.Length ?? 0) * 2L;
 
     private void AppendImages(HighlightedDocument document) {
         if (document.Images.IsEmpty)
@@ -23,14 +23,15 @@ internal sealed partial class PagerSpool {
             TerminalImage image = document.Images.Span[index].Image;
             long position = _data.Length;
             _data.Position = position;
-            _data.Write(MemoryMarshal.AsBytes(image.Sixel.Span));
+            _data.Write(MemoryMarshal.AsBytes(image.Payload.Span));
             entry.Clear();
             BitConverter.TryWriteBytes(entry, checked(_offset + document.Lines.Span[bounds.Row].Start));
             BitConverter.TryWriteBytes(entry[4..], bounds.Column);
             BitConverter.TryWriteBytes(entry[8..], bounds.Width);
             BitConverter.TryWriteBytes(entry[12..], bounds.Height);
             BitConverter.TryWriteBytes(entry[16..], position);
-            BitConverter.TryWriteBytes(entry[24..], image.Sixel.Length);
+            BitConverter.TryWriteBytes(entry[24..], image.Payload.Length);
+            BitConverter.TryWriteBytes(entry[28..], (int)image.Protocol);
             _images.Position = (long)_imageCount * ImageEntrySize;
             _images.Write(entry);
             _imageCount++;
@@ -65,7 +66,8 @@ internal sealed partial class PagerSpool {
             char[] payload = new char[length];
             _data.Position = BitConverter.ToInt64(entry[16..]);
             _data.ReadExactly(MemoryMarshal.AsBytes(payload.AsSpan()));
-            var image = new TerminalImage(BitConverter.ToInt32(entry[8..]), BitConverter.ToInt32(entry[12..]), payload);
+            var image = new TerminalImage(BitConverter.ToInt32(entry[8..]), BitConverter.ToInt32(entry[12..]), payload,
+                (TerminalImageProtocol)BitConverter.ToInt32(entry[28..]));
             _cachedImage = length <= CacheBudget / sizeof(char) ? image : null;
             _cachedImageIndex = _cachedImage is null ? -1 : index;
             return image;

@@ -6,65 +6,89 @@ using PSTextMate.Core;
 
 namespace PSTextMate.Images;
 
-/// <summary>Optional Sixel module integration, loaded only for Markdown images.</summary>
+/// <summary>
+/// Markdown images. Terminals that decode images themselves (Kitty with PNG, iTerm2 inline images) are drawn
+/// directly. Sixel, other formats and the portable cell fallback use the optional Sixel module.
+/// </summary>
 public sealed class Compiler : IImagePresentation {
+    private const int MaximumImageBytes = 32 * 1024 * 1024;
     private static readonly Lazy<HttpClient> ImageClient = new(static () => new HttpClient {
         Timeout = TimeSpan.FromSeconds(5),
-        MaxResponseContentBufferSize = 32 * 1024 * 1024
+        MaxResponseContentBufferSize = MaximumImageBytes
     });
-    public TerminalGraphics GetTerminalGraphics() {
-        foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies()) {
-            if (assembly.GetName().Name == "System.Management.Automation")
-                return GetGraphicsInRunspace();
-        }
-        return default;
-    }
 
-    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-    private static TerminalGraphics GetGraphicsInRunspace() {
-        if (Runspace.DefaultRunspace is null)
-            return default;
-        using var pipeline = PowerShell.Create(RunspaceMode.CurrentRunspace);
-        try {
-            // Older Sixel releases query through Console.ReadKey. PSReadLine can leave VT input enabled;
-            // temporarily own the compatible input mode and restore every entry flag afterwards.
-            using ConsoleModeLease? modes = Console.IsInputRedirected || Console.IsOutputRedirected ? null : ConsoleModeLease.Enter();
-            pipeline.AddScript("""
-                $sixelModule = Microsoft.PowerShell.Core\Get-Module -Name Sixel
-                if (-not $sixelModule) {
-                    Microsoft.PowerShell.Core\Import-Module Sixel -ErrorAction Stop
-                }
-                $compatibility = [System.Management.Automation.PSTypeName]::new('Sixel.Terminal.Compatibility').Type
-                if ($null -eq $compatibility -or $null -eq $compatibility.GetMethod('GetCellSize') -or
-                    $null -eq $compatibility.GetMethod('TerminalSupportsSixel')) {
-                    return
-                }
-                $cellSize = $compatibility::GetCellSize()
-                $compatibility::TerminalSupportsSixel()
-                $cellSize.PixelWidth
-                $cellSize.PixelHeight
-                """, useLocalScope: true);
-            Collection<PSObject> values = pipeline.Invoke();
-            return values.Count == 3 && values[0].BaseObject is bool supported
-                && values[1].BaseObject is int width && values[2].BaseObject is int height
-                ? new(supported, width, height) : default;
-        }
-        catch (RuntimeException) {
-            return default;
-        }
-    }
+    /// <summary>The capabilities TextMate probed once for the session; reading them performs no terminal I/O.</summary>
+    public TerminalGraphics GetTerminalGraphics() => TerminalCapabilities.Current.Graphics;
 
     public HighlightedDocument? Render(HighlightedDocument document, string source, string? baseDirectory, int width, int height = 0) {
-        // Direct .NET callers need no PowerShell runtime. Do not JIT PowerShell code until hosted.
-        foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies()) {
-            if (assembly.GetName().Name == "System.Management.Automation")
-                return RenderInRunspace(document, source, baseDirectory, width, height);
+        if (height <= 0)
+            height = !Console.IsOutputRedirected ? Math.Max(1, Console.WindowHeight - 2) : 30;
+        width = Math.Max(1, width);
+        TerminalGraphics graphics = TerminalCapabilities.Current.Graphics;
+        Stream? image;
+        try {
+            image = TryOpenImage(source, baseDirectory);
         }
-        return null;
+        catch (Exception error) when (error is IOException or HttpRequestException or OperationCanceledException or UnauthorizedAccessException or ArgumentException or NotSupportedException) {
+            // Unreachable or unreadable images keep their clickable label.
+            return null;
+        }
+        using (image) {
+            if (image is not null && RenderBuiltIn(document, image, graphics, width, height) is { } drawn)
+                return drawn;
+            if (image is not null)
+                image.Position = 0;
+            // Direct .NET callers need no PowerShell runtime. Do not JIT PowerShell code until hosted.
+            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies()) {
+                if (assembly.GetName().Name == "System.Management.Automation")
+                    return RenderInRunspace(document, source, baseDirectory, image, graphics, width, height);
+            }
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Draws an image the terminal decodes itself, without the Sixel module or an image library: PNG through the
+    /// Kitty graphics protocol, or PNG, JPEG and GIF as iTerm2 inline images. The cell rectangle keeps the image's
+    /// aspect ratio; the terminal scales the pixels into it.
+    /// </summary>
+    internal static HighlightedDocument? RenderBuiltIn(HighlightedDocument document, Stream image, TerminalGraphics graphics, int width, int height) {
+        if (!graphics.HasCellSize || !(graphics.Kitty || graphics.InlineImage) || image.Length > MaximumImageBytes)
+            return null;
+        Span<byte> header = stackalloc byte[8];
+        long start = image.Position;
+        int read = image.ReadAtLeast(header, header.Length, throwOnEndOfStream: false);
+        image.Position = start;
+        TerminalImageWriter.Format format = TerminalImageWriter.Detect(header[..read]);
+        TerminalImageProtocol protocol;
+        if (graphics.Kitty && format == TerminalImageWriter.Format.Png)
+            protocol = TerminalImageProtocol.Kitty;
+        else if (graphics.InlineImage && format != TerminalImageWriter.Format.Unknown)
+            protocol = TerminalImageProtocol.InlineImage;
+        else
+            return null;
+        if (!ImageHeader.TryRead(image, out ImageDimensions dimensions))
+            return null;
+        (int columns, int rows) = ImageSizing.Fit(dimensions, graphics with { Sixel = false }, width, height);
+        byte[] bytes = new byte[image.Length - start];
+        image.ReadExactly(bytes);
+        string payload = protocol == TerminalImageProtocol.Kitty
+            ? TerminalImageWriter.Kitty(bytes, columns, rows)
+            : TerminalImageWriter.InlineImage(bytes, columns, rows);
+        // Reserve the rectangle. Outputs that cannot draw graphics show it as blank space below the image's label.
+        var builder = new PresentedTextBuilder();
+        for (int row = 0; row < rows; row++) {
+            if (row > 0)
+                builder.NewLine();
+            builder.AppendRepeated(' ', columns, TextStyle.Plain);
+        }
+        builder.AddImage(0, new TerminalImage(columns, rows, payload.AsMemory(), protocol));
+        return builder.Build(document);
     }
 
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-    private static HighlightedDocument? RenderInRunspace(HighlightedDocument document, string source, string? baseDirectory, int width, int height) {
+    private static HighlightedDocument? RenderInRunspace(HighlightedDocument document, string source, string? baseDirectory,
+        Stream? imageStream, TerminalGraphics graphics, int width, int height) {
         if (Runspace.DefaultRunspace is null)
             return null;
         using var pipeline = PowerShell.Create(RunspaceMode.CurrentRunspace);
@@ -80,11 +104,21 @@ public sealed class Compiler : IImagePresentation {
             }
             pipeline.Commands.Clear();
             pipeline.Streams.Error.Clear();
-            TerminalGraphics graphics = GetGraphicsInRunspace();
-            using Stream? imageStream = TryOpenImage(source, baseDirectory);
-            if (height <= 0)
-                height = !Console.IsOutputRedirected ? Math.Max(1, Console.WindowHeight - 2) : 30;
-            int requestedWidth = Math.Max(1, width);
+            // -Force skips the module's own probe; hand it the cell size TextMate measured so pixel sizes agree.
+            TerminalCapabilities capabilities = TerminalCapabilities.Current;
+            if (capabilities.CellSizeMeasured) {
+                pipeline.AddScript("""
+                    param($width, $height)
+                    $compatibility = [System.Management.Automation.PSTypeName]::new('Sixel.Terminal.Compatibility').Type
+                    if ($null -ne $compatibility -and $null -ne $compatibility.GetMethod('SetCellSize')) {
+                        $compatibility::SetCellSize($width, $height)
+                    }
+                    """, useLocalScope: true).AddArgument(capabilities.CellWidth).AddArgument(capabilities.CellHeight);
+                pipeline.Invoke();
+                pipeline.Commands.Clear();
+                pipeline.Streams.Error.Clear();
+            }
+            int requestedWidth = width;
             int requestedHeight = Math.Max(1, height);
             if (imageStream is not null && ImageHeader.TryRead(imageStream, out ImageDimensions dimensions))
                 (requestedWidth, requestedHeight) = ImageSizing.Fit(dimensions, graphics, requestedWidth, requestedHeight);
@@ -109,13 +143,15 @@ public sealed class Compiler : IImagePresentation {
                 .AddParameter("ErrorAction", ActionPreference.Stop);
             Collection<PSObject> output = pipeline.Invoke();
             HighlightedDocument? fallback = output.Count == 1 && output[0].BaseObject is string text ? Parse(document, text) : null;
-            if (fallback is null || !graphics.CanDraw || imageStream is null)
+            string? protocol = graphics.Kitty ? "KittyGraphicsProtocol" : graphics.InlineImage ? "InlineImageProtocol" : graphics.Sixel ? "Sixel" : null;
+            if (fallback is null || protocol is null || !graphics.HasCellSize || imageStream is null)
                 return fallback;
             imageStream.Position = 0;
             pipeline.Commands.Clear();
             pipeline.Streams.Error.Clear();
+            // The protocol TextMate detected; TextMate only recognizes, places and redraws the sequence returned.
             pipeline.AddCommand("Sixel\\ConvertTo-Sixel").AddParameter("Stream", imageStream)
-                .AddParameter("Protocol", "Sixel").AddParameter("Force")
+                .AddParameter("Protocol", protocol).AddParameter("Force")
                 .AddParameter("Width", requestedWidth).AddParameter("Height", requestedHeight)
                 .AddParameter("ErrorAction", ActionPreference.Stop);
             try {
@@ -124,16 +160,16 @@ public sealed class Compiler : IImagePresentation {
             catch (RuntimeException) {
                 return fallback;
             }
-            if (output.Count != 1 || output[0].BaseObject is not string sixel
-                || output[0].Properties["Width"]?.Value is not int imageWidth
-                || output[0].Properties["Height"]?.Value is not int imageHeight
-                || imageWidth < 1 || imageWidth > width || imageHeight < 1 || imageHeight > height) {
+            if (output.Count != 1 || output[0].BaseObject is not string sequence
+                || !TerminalImageParser.TryFind(sequence, TerminalImageParser.CellMetrics.From(graphics, width, height), out TerminalImage? parsed)) {
                 return fallback;
             }
-
-            ReadOnlyMemory<char> payload = VT.ExtractSixel(sixel);
-            if (payload.IsEmpty)
+            // The module's reported cell size is authoritative; the sequence's own size is the fallback.
+            int imageWidth = output[0].Properties["Width"]?.Value is int reportedWidth and > 0 ? reportedWidth : parsed!.Width;
+            int imageHeight = output[0].Properties["Height"]?.Value is int reportedHeight and > 0 ? reportedHeight : parsed!.Height;
+            if (imageWidth < 1 || imageWidth > width || imageHeight < 1 || imageHeight > height)
                 return fallback;
+            ReadOnlyMemory<char> payload = parsed!.Payload;
             var builder = new PresentedTextBuilder();
             builder.Append(fallback);
             int rows = Math.Max(fallback.LineCount, imageHeight);
@@ -144,7 +180,7 @@ public sealed class Compiler : IImagePresentation {
             int columns = imageWidth;
             foreach (HighlightedLine line in fallback.Lines.Span)
                 columns = Math.Max(columns, TerminalCells.Measure(fallback.Text.AsSpan(line.Start, line.Length)));
-            builder.AddImage(0, new TerminalImage(columns, rows, payload));
+            builder.AddImage(0, new TerminalImage(columns, rows, payload, parsed.Protocol));
             return builder.Build(document);
         }
         catch (Exception error) when (error is RuntimeException or IOException or HttpRequestException or OperationCanceledException or UnauthorizedAccessException or ArgumentException or NotSupportedException) {
@@ -152,7 +188,6 @@ public sealed class Compiler : IImagePresentation {
             return null;
         }
     }
-
     private static Stream? TryOpenImage(string source, string? baseDirectory) {
         if (Uri.TryCreate(source, UriKind.Absolute, out Uri? uri) && uri.Scheme is "http" or "https") {
             using var request = new HttpRequestMessage(HttpMethod.Get, uri);

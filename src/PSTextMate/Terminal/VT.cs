@@ -29,6 +29,18 @@ public static partial class VT {
     public const string InlineSixelModes = "\u001b[?80;8452l";
     public const string SaveSixelModes = "\u001b[?80;8452s";
     public const string RestoreSixelModes = "\u001b[?80;8452r";
+    /// <summary>Deletes every Kitty placement on the current screen and frees its image data. Text is unaffected.</summary>
+    public const string DeleteKittyPlacements = "\u001b_Ga=d,d=A,q=2\u001b\\";
+
+    /// <summary>
+    /// Draws a retained image at the cursor. Sixel scrolling is disabled for the placement; Kitty, iTerm2 and
+    /// Good Image payloads are written as they were received.
+    /// </summary>
+    internal static void WriteImage(TextWriter writer, TerminalImage image) {
+        if (image.Protocol == TerminalImageProtocol.Sixel)
+            writer.Write(InlineSixelModes);
+        writer.Write(image.Payload.Span);
+    }
 
     internal static ReadOnlyMemory<char> ExtractSixel(string text) {
         int start = text.IndexOf("\u001bP", StringComparison.Ordinal);

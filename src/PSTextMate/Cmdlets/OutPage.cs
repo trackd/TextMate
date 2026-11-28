@@ -14,6 +14,8 @@ public sealed class OutPageCmdlet : PSCmdlet, IDisposable {
     private bool _wrote;
     private int _width;
     private int _disposed;
+    // Set when the user closed the pager while input was still arriving.
+    private bool _closed;
 
     [Parameter(ValueFromRemainingArguments = true, DontShow = true, Position = 0)]
     public PSObject[]? EaterOfArgs { get; set; }
@@ -24,6 +26,8 @@ public sealed class OutPageCmdlet : PSCmdlet, IDisposable {
 
     protected override void BeginProcessing() {
         _redirected = Console.IsInputRedirected || Console.IsOutputRedirected;
+        // Before the pager thread owns keyboard input: later image sizing only reads the cached result.
+        TerminalCapabilities.Prepare(this);
         _width = 80;
         try {
             int width = Host.UI.RawUI.WindowSize.Width;
@@ -37,7 +41,7 @@ public sealed class OutPageCmdlet : PSCmdlet, IDisposable {
     }
 
     protected override void ProcessRecord() {
-        if (InputObject?.BaseObject is not { } value)
+        if (_closed || InputObject?.BaseObject is not { } value)
             return;
         try {
             _cancellation.Token.ThrowIfCancellationRequested();
@@ -64,12 +68,25 @@ public sealed class OutPageCmdlet : PSCmdlet, IDisposable {
                 WriteFormatted(_formatter.Process(InputObject));
             }
         }
+        catch (OperationCanceledException) when (ClosedByUser) {
+            _closed = true;
+            StopUpstreamCommands();
+        }
         catch (OperationCanceledException) {
             throw new PipelineStoppedException();
         }
         catch (IOException error) {
             ThrowTerminatingError(new ErrorRecord(error, "PagerFailed", ErrorCategory.WriteError, this));
         }
+    }
+
+    // The pager ended while this command was not being stopped: the user quit before the input finished.
+    private bool ClosedByUser => _pager is not null && !_cancellation.IsCancellationRequested;
+
+    private void StopUpstreamCommands() {
+        if (PipelineControl.CreateStopUpstream(this) is { } stop)
+            throw stop;
+        // Without the engine type, the remaining input is discarded; the caller's script continues either way.
     }
 
     private void WriteFormatted(Array values) {
@@ -117,6 +134,8 @@ public sealed class OutPageCmdlet : PSCmdlet, IDisposable {
 
     protected override void EndProcessing() {
         try {
+            if (_closed)
+                return;
             if (_pendingDocument is { } document) {
                 TextPager.Show(document, cancellationToken: _cancellation.Token);
                 _pendingDocument = null;
@@ -124,6 +143,9 @@ public sealed class OutPageCmdlet : PSCmdlet, IDisposable {
             if (_formatter is not null)
                 WriteFormatted(_formatter.End());
             _pager?.Complete();
+        }
+        catch (OperationCanceledException) when (ClosedByUser) {
+            // Quitting while the last formatted lines arrive ends the command normally.
         }
         catch (OperationCanceledException) {
             throw new PipelineStoppedException();

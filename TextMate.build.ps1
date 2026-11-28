@@ -178,12 +178,10 @@ task Test -if (-not $SkipTests) {
     Import-Module Pester -RequiredVersion 5.7.1 -ErrorAction Stop
     $pesterConfig = New-PesterConfiguration
     # $pesterConfig.Output.Verbosity = 'Detailed'
-    $pesterConfig.Run.Path = if ($Renderer -contains 'Spectre') {
-        $folders.TestPath
-    }
-    else {
-        @('Text.tests.ps1', 'TextContent.tests.ps1', 'Extensions.tests.ps1', 'Help.tests.ps1', 'RenderingRegression.tests.ps1', 'Test-TextMate.tests.ps1', 'Get-TextMateGrammar.tests.ps1', 'Out-Page.tests.ps1') |
-            ForEach-Object { Join-Path $folders.TestPath $_ }
+    $pesterConfig.Run.Path = $folders.TestPath
+    if ($Renderer -notcontains 'Spectre') {
+        # Suites tagged 'Adapter' need the bundled Spectre runtime; every other suite always runs.
+        $pesterConfig.Filter.ExcludeTag = 'Adapter'
     }
     $pesterConfig.Run.Throw = $true
     $pesterConfig.Run.Exit = $false

@@ -56,12 +56,12 @@ public static class OutputRenderer {
         if (format == OutputFormat.Html) {
             document = DocumentPresentation.Prepare(document, options);
             result = HtmlRenderer.Format(document);
-            Documents.Add(result, document);
+            Documents.AddOrUpdate(result, document);
         }
         else {
             result = Get(format).Render(document, options);
             if (result is not ITextMateOutput)
-                Documents.Add(result, DocumentPresentation.Prepare(document, options));
+                Documents.AddOrUpdate(result, DocumentPresentation.Prepare(document, options));
         }
         return result;
     }
@@ -94,11 +94,35 @@ public static class OutputRenderer {
             : value.ToString() ?? string.Empty;
     }
 
+    /// <summary>
+    /// PowerShell formatting entry point. Like a Spectre renderable, the document is laid out at the width
+    /// available when it is displayed; an explicit -Width only caps that width.
+    /// </summary>
     public static string Format(object value, int availableWidth) {
         ArgumentOutOfRangeException.ThrowIfLessThan(availableWidth, 1);
         while (value is PSObject wrapper)
             value = wrapper.BaseObject;
-        return value is TextContent content ? TextRenderer.Format(content.Layout(availableWidth)) : Format(value);
+        if (value is TextContent content)
+            return TextRenderer.Format(content.Layout(availableWidth));
+        return TryGetDocument(value, out HighlightedDocument? document)
+            ? TextRenderer.Format(LayoutForDisplay(document!, availableWidth))
+            : value.ToString() ?? string.Empty;
+    }
+
+    internal static HighlightedDocument LayoutForDisplay(HighlightedDocument document, int availableWidth) {
+        if (document.Content is not null)
+            return DocumentPresentation.Prepare(document, document.LayoutOptions with { Width = availableWidth });
+        if (document.LayoutSource is not null) {
+            RendererOptions options = document.LayoutOptions;
+            bool constrained = options.ConstrainWidth ?? (options.Width > 0);
+            int width = constrained && options.Width > 0 ? Math.Min(availableWidth, options.Width) : availableWidth;
+            if (width == options.Width)
+                return document;
+        }
+        else if (document.IsPresented) {
+            return document;
+        }
+        return new TextMateView(document).Layout(availableWidth);
     }
 
     internal static IOutputRenderer Get(OutputFormat format) {

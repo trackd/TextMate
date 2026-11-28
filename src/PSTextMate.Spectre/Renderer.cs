@@ -31,12 +31,36 @@ public sealed class TextMateRenderable : IRenderable, ITextMateOutput {
         Document = _view.Layout(options.Width > 0 ? options.Width : 80);
     }
 
+    // Members retained from the 0.x HighlightedText renderable so existing scripts keep working.
+
+    /// <summary>Wraps the highlighted content in an expanded, unpadded panel.</summary>
+    public Panel ToPanel(string? title = null, BoxBorder? border = null) {
+        var panel = new Panel(this).Padding(0, 0).Expand();
+        if (!string.IsNullOrEmpty(title))
+            panel.Header(title);
+        if (border is not null)
+            panel.Border(border);
+        return panel;
+    }
+
+    public Padder WithPadding(Padding padding) => new(this, padding);
+    public Padder WithPadding(int size) => new(this, new Padding(size));
+
+    /// <summary>Shows the content in the built-in pager.</summary>
+    public void ShowPager() {
+        if (LineCount > 0)
+            TextPager.Show(Document);
+    }
+
+    /// <summary>The styled text as PowerShell would display it.</summary>
+    public override string ToString() => OutputRenderer.Format(this);
+
     public Measurement Measure(RenderOptions options, int maxWidth) {
         HighlightedDocument document = _view.Layout(Math.Max(1, maxWidth));
         lock (_gate) {
             Document = document;
             if (!ReferenceEquals(document, _measured)) {
-                int gutter = document.ShowLineNumbers ? document.LineCount.ToString(CultureInfo.InvariantCulture).Length + 3 : 0;
+                int gutter = document.ShowLineNumbers ? document.LineNumberTotal.ToString(CultureInfo.InvariantCulture).Length + 3 : 0;
                 _measuredWidth = 0;
                 foreach (HighlightedLine line in document.Lines.Span)
                     _measuredWidth = Math.Max(_measuredWidth, TerminalCells.Measure(document.Text.AsSpan(line.Start, line.Length)) + gutter);
@@ -64,7 +88,7 @@ public sealed class TextMateRenderable : IRenderable, ITextMateOutput {
             HighlightedLine line = document.Lines.Span[index];
             int available = Math.Max(0, maxWidth);
             if (document.ShowLineNumbers) {
-                string gutter = LineNumberGutter.Format(index + 1, document.LineCount);
+                string gutter = LineNumberGutter.Format(document.GetLineNumber(index), document.LineNumberTotal);
                 int fit = TerminalCells.Fit(gutter, available);
                 yield return new Segment(gutter[..fit]);
                 available -= TerminalCells.Measure(gutter.AsSpan(0, fit));
@@ -117,5 +141,8 @@ public sealed class TextMateRenderable : IRenderable, ITextMateOutput {
         }
     }
 
-    private static Color? Color(int rgb) => rgb < 0 ? null : new Color((byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb);
+    // Palette references stay palette colors so Spectre writes them as indexed colors.
+    private static Color? Color(int value) => value < 0 ? null
+        : value >= 0x1000000 ? global::Spectre.Console.Color.FromInt32(value & 0xff)
+        : new Color((byte)(value >> 16), (byte)(value >> 8), (byte)value);
 }

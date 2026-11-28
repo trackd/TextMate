@@ -22,8 +22,8 @@ public sealed class PagerSpoolImageTests {
         Assert.Equal(2, spool.ImageCount);
         Assert.Equal(new TextBounds(0, 1, 3, 2), spool.GetImageBounds(0));
         Assert.Equal(new TextBounds(0, 5, 3, 2), spool.GetImageBounds(1));
-        Assert.Equal("first", spool.ReadImage(0).Sixel.ToString());
-        Assert.Equal("second", spool.ReadImage(1).Sixel.ToString());
+        Assert.Equal("first", spool.ReadImage(0).Payload.ToString());
+        Assert.Equal("second", spool.ReadImage(1).Payload.ToString());
         spool.SetWidth(2);
         Assert.Equal(new TextBounds(0, 4, 3, 2), spool.GetImageBounds(0));
         Assert.Equal(new TextBounds(0, 13, 3, 2), spool.GetImageBounds(1));
@@ -32,7 +32,7 @@ public sealed class PagerSpoolImageTests {
         spool.SetWidth(20);
         Assert.Equal(8, spool.LineCount);
         Assert.Equal(new TextBounds(0, 5, 3, 2), spool.GetImageBounds(1));
-        Assert.Equal("first", spool.ReadImage(0).Sixel.ToString());
+        Assert.Equal("first", spool.ReadImage(0).Payload.ToString());
     }
 
     [Fact]
@@ -53,7 +53,7 @@ public sealed class PagerSpoolImageTests {
         spool.Append(Create(new string('x', 2_100_000)));
         string path = Assert.IsType<string>(spool.ImageHistoryPath);
         Assert.True(File.Exists(path));
-        Assert.Equal(2_100_000, spool.ReadImage(0).Sixel.Length);
+        Assert.Equal(2_100_000, spool.ReadImage(0).Payload.Length);
         Assert.Equal(0, spool.CachedImageBytes);
         spool.Append(Create("small"));
         TerminalImage cached = spool.ReadImage(1);

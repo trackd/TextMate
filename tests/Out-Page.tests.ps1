@@ -47,6 +47,39 @@ Import-Module $moduleFile -ErrorAction Stop
             $childProcess.Dispose()
         }
     }
+    It 'Ends only the upstream commands, not the calling script, when the pager closes early' {
+        # Out-Page throws this when the user quits before the input ends; the statement after the pipeline must run.
+        $control = [PSTextMate.Commands.OutPageCmdlet].Assembly.GetType('PSTextMate.Utilities.PipelineControl', $true)
+        if (-not ('TextMateTests.StopAtThreeCommand' -as [type])) {
+            Add-Type -TypeDefinition @'
+using System;
+using System.Management.Automation;
+using System.Reflection;
+namespace TextMateTests {
+    [Cmdlet("Stop", "AtThree")]
+    public sealed class StopAtThreeCommand : PSCmdlet {
+        public static MethodInfo Create;
+        [Parameter(ValueFromPipeline = true)] public int Value { get; set; }
+        protected override void ProcessRecord() {
+            if (Value == 3)
+                throw (Exception)Create.Invoke(null, new object[] { this });
+            WriteObject(Value);
+        }
+    }
+}
+'@
+        }
+        [TextMateTests.StopAtThreeCommand]::Create = $control.GetMethod('CreateStopUpstream', [Reflection.BindingFlags]'NonPublic, Static')
+        Import-Module -Assembly ([TextMateTests.StopAtThreeCommand].Assembly) -Force
+        $produced = [Collections.Generic.List[int]]::new()
+        $result = & {
+            1..1000 | ForEach-Object { $produced.Add($_); $_ } | Stop-AtThree
+            'after'
+        }
+        $result | Should -Be @(1, 2, 'after')
+        $produced.Count | Should -Be 3
+    }
+
     It 'Has command metadata and help' {
         $cmd = Get-Command Out-Page -ErrorAction Stop
         $cmd | Should -Not -BeNullOrEmpty

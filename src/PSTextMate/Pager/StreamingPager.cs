@@ -8,6 +8,12 @@ internal sealed class StreamingPager : IDisposable {
     private System.Runtime.ExceptionServices.ExceptionDispatchInfo? _failure;
     private TextStyle _style = TextStyle.Plain;
     private int _disposed;
+    private TerminalImageParser.CellMetrics? _cells;
+
+    // Read once, when the first image sequence arrives. The pager thread owns keyboard input, so this never
+    // queries the terminal: Out-Page probed before the pager started, else the OS cell size or 10x20 is used.
+    private TerminalImageParser.CellMetrics CellMetrics() => _cells ??= TerminalImageParser.CellMetrics.Current(
+        Math.Max(1, Console.WindowWidth), Math.Max(1, Console.WindowHeight));
 
     internal StreamingPager(CancellationToken cancellationToken, IPagerTerminal? terminal = null) {
         _stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -36,7 +42,7 @@ internal sealed class StreamingPager : IDisposable {
                 ThrowIfStopped();
                 return;
             }
-            var parser = new VTParser(_style);
+            var parser = new VTParser(_style, CellMetrics);
             parser.Append(text);
             HighlightedDocument document = parser.Build(text);
             _style = parser.CurrentStyle;

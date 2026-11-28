@@ -24,7 +24,7 @@ public sealed class Renderer : IOutputRenderer {
             lineShifts = new int[document.LineCount];
             for (int index = 0; index < document.LineCount; index++) {
                 HighlightedLine line = document.Lines.Span[index];
-                LineNumberGutter.Append(builder, index + 1, document.LineCount);
+                LineNumberGutter.Append(builder, document.GetLineNumber(index), document.LineNumberTotal);
                 lineShifts[index] = builder.Length - line.Start;
                 int end = index + 1 < document.LineCount ? document.Lines.Span[index + 1].Start : document.Text.Length;
                 builder.Append(document.Text.AsSpan(line.Start, end - line.Start));
@@ -69,7 +69,10 @@ public sealed class Renderer : IOutputRenderer {
         return new Paragraph(text) { Runs = runs, Hyperlinks = hyperlinks?.ToArray() ?? [], Wrap = true };
     }
 
-    private static Color ToColor(int rgb) => Color.Rgb((byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb);
+    // Palette references stay palette colors so the user's terminal theme applies.
+    private static Color ToColor(int value) => value >= 0x1000000
+        ? (value & 0xff) < 16 ? Color.Basic16(value & 0xff) : Color.Indexed256(value & 0xff)
+        : Color.Rgb((byte)(value >> 16), (byte)(value >> 8), (byte)value);
 }
 
 /// <summary>Native XenoAtom visual which shares TextMate's width-dependent layout.</summary>

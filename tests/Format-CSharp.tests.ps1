@@ -6,7 +6,7 @@ BeforeAll {
     Import-Module (Join-Path $PSScriptRoot 'testhelper.psm1') -Force
 }
 
-Describe 'Format-CSharp' {
+Describe 'Format-CSharp' -Tag 'Adapter' {
     It 'Formats a simple C# string and returns renderables' {
         $code = 'public class Foo { }'
         $out = $code | Format-CSharp -OutputFormat Spectre

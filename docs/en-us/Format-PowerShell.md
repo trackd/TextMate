@@ -79,7 +79,7 @@ HelpMessage: ''
 
 ### -Width
 
-Sets the common layout width in terminal columns for every output format. When omitted, reads the current console window width for each input document, falling back to the host buffer width or 80 columns when unavailable. Specify a width for a narrower application viewport.
+Caps the layout width in terminal columns for every output format. Like a Spectre renderable, Text and native output are laid out when they are displayed, at the width then available (the console window width, or the width of a native container); -Width only narrows that width. When omitted, Text output reflows to the current window, and HTML output keeps each source line unwrapped. With -LineNumbers, wrapped rows keep the source line's number and leave the gutter of continuation rows blank.
 
 ```yaml
 Type: System.Int32

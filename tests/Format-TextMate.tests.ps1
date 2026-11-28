@@ -13,7 +13,7 @@ function Foo-Bar {
     $psowrapped.psobject.properties.add($note)
 }
 
-Describe 'Format-TextMate' {
+Describe 'Format-TextMate' -Tag 'Adapter' {
     It 'Formats a PSObject with PSChildName and returns rendered PowerShell output' {
         $out2 = $psowrapped | Format-TextMate -OutputFormat Spectre
         $out2 | Should -Not -BeNullOrEmpty

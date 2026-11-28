@@ -22,7 +22,13 @@ internal sealed class ConsoleModeLease : IDisposable {
 
     internal static ConsoleModeLease? Enter() => OperatingSystem.IsWindows() ? new(new WindowsConsoleModeApi()) : null;
 
-    internal ConsoleModeLease(IConsoleModeApi api) {
+    /// <summary>
+    /// Input mode for reading terminal query replies: VT input on, line input and echo off. Without VT input,
+    /// ConPTY parses APC and DCS replies as keys and drops them, leaving only the terminator's backslash.
+    /// </summary>
+    internal static ConsoleModeLease? EnterQuery() => OperatingSystem.IsWindows() ? new(new WindowsConsoleModeApi(), query: true) : null;
+
+    internal ConsoleModeLease(IConsoleModeApi api, bool query = false) {
         _api = api;
         _input = api.Handle(-10);
         _output = api.Handle(-11);
@@ -32,7 +38,7 @@ internal sealed class ConsoleModeLease : IDisposable {
         try {
             // Console.ReadKey consumes console key records, not Sixel's raw VT byte stream.
             // Disable processing/line/echo/quick-edit and VT translation; preserve all other flags.
-            uint readKeyMode = (_inputMode | 0x0080u) & ~0x0247u;
+            uint readKeyMode = query ? (_inputMode | 0x0200u) & ~0x0006u : (_inputMode | 0x0080u) & ~0x0247u;
             _restoreInput = true;
             if (!api.Set(_input, readKeyMode))
                 throw Failure("acquire pager input mode");

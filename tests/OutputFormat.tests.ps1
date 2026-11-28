@@ -4,7 +4,7 @@ BeforeAll {
     }
 }
 
-Describe 'Output format presentation parity' {
+Describe 'Output format presentation parity' -Tag 'Adapter' {
     It 'Exports shared Markdown as escaped HTML without changing its presentation' {
         $source = "# Heading`n`n**bold** and [safe](https://example.com) and [unsafe](javascript:alert).`n`n``<script>``"
         $document = $source | Format-Markdown -Width 40

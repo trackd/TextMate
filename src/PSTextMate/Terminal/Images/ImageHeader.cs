@@ -1,6 +1,6 @@
 using System.Buffers.Binary;
 
-namespace PSTextMate.Images;
+namespace PSTextMate.Core;
 
 internal readonly record struct ImageDimensions(int Width, int Height);
 

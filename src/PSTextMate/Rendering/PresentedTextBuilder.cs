@@ -11,11 +11,21 @@ internal sealed class PresentedTextBuilder {
     internal int Length => _text.Length;
     internal int LineCount { get; private set; } = 1;
 
+    internal const int TabSize = 4;
+    // Start of the current output line, and the cell column known at _columnAt (both indexes into _text).
+    private int _lineStart;
+    private int _columnAt;
+    private int _column;
+
     internal void Append(ReadOnlySpan<char> text, TextStyle style) {
         int start = _text.Length;
         if (!_skipLineFeed && text.IndexOfAny('\r', '\t') < 0 && !TerminalText.HasControls(text)) {
             _text.Append(text);
-            LineCount += text.Count('\n');
+            int lines = text.Count('\n');
+            if (lines != 0) {
+                LineCount += lines;
+                _lineStart = start + text.LastIndexOf('\n') + 1;
+            }
             AddRange(start, text.Length, style);
             return;
         }
@@ -28,21 +38,48 @@ internal sealed class PresentedTextBuilder {
             if (character == '\r') {
                 _text.Append('\n');
                 LineCount++;
+                _lineStart = _text.Length;
                 _skipLineFeed = true;
             }
             else if (character == '\t') {
-                _text.Append("    ");
+                // Tab stops are columns, as in an editor: a tab after "ab" advances two cells, not four.
+                _text.Append(' ', TabSize - (CurrentColumn() % TabSize));
             }
             else if (character != '\n' && char.IsControl(character)) {
                 _text.Append(TerminalText.Visible(character));
             }
             else {
                 _text.Append(character);
-                if (character == '\n')
+                if (character == '\n') {
                     LineCount++;
+                    _lineStart = _text.Length;
+                }
             }
         }
         AddRange(start, _text.Length - start, style);
+    }
+
+    /// <summary>Cells on the current output line, measured incrementally from the last known column.</summary>
+    private int CurrentColumn() {
+        if (_columnAt < _lineStart) {
+            _columnAt = _lineStart;
+            _column = 0;
+        }
+        int length = _text.Length - _columnAt;
+        if (length > 0) {
+            char[]? rented = null;
+            Span<char> buffer = length <= 256 ? stackalloc char[256] : (rented = ArrayPool<char>.Shared.Rent(length));
+            try {
+                _text.CopyTo(_columnAt, buffer, length);
+                _column += TerminalCells.Measure(buffer[..length]);
+            }
+            finally {
+                if (rented is not null)
+                    ArrayPool<char>.Shared.Return(rented);
+            }
+            _columnAt = _text.Length;
+        }
+        return _column;
     }
 
     // Layout padding and borders are printable characters and need no control normalization.
@@ -113,7 +150,10 @@ internal sealed class PresentedTextBuilder {
 
     internal void NewLine() => Append("\n", Plain);
 
-    internal HighlightedDocument Build(HighlightedDocument original) {
+    internal HighlightedDocument Build(HighlightedDocument original) => Build(original, null);
+
+    /// <param name="lineNumbers">Source line number per built line; 0 marks a wrapped continuation.</param>
+    internal HighlightedDocument Build(HighlightedDocument original, int[]? lineNumbers) {
         string text = _text.ToString();
         var lines = new List<HighlightedLine>();
         var ranges = new List<StyledRange>(_ranges.Count);
@@ -142,6 +182,7 @@ internal sealed class PresentedTextBuilder {
             while (rangeIndex < _ranges.Count && _ranges[rangeIndex].Start + _ranges[rangeIndex].Length <= start)
                 rangeIndex++;
         }
-        return original.WithPresentation(text, [.. ranges], [.. lines], _images?.ToArray());
+        return original.WithPresentation(text, [.. ranges], [.. lines], _images?.ToArray(),
+            lineNumbers?.Length == lines.Count ? lineNumbers : null);
     }
 }

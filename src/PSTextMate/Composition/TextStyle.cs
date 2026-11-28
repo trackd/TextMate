@@ -6,17 +6,17 @@ public enum TextDecoration : ushort {
     Dim = 16, SlowBlink = 32, Invert = 64, Conceal = 128, RapidBlink = 256
 }
 
-/// <summary>RGB colors, or -1 for the terminal default.</summary>
+/// <summary>Colors are -1 for the terminal default, RGB, or a palette reference; use <see cref="TextColor"/> to build or read them.</summary>
 public readonly record struct TextStyle(int Foreground, int Background, TextDecoration Decoration, string? Hyperlink = null) {
     public static TextStyle Plain => new(-1, -1, TextDecoration.None);
     public TextStyle(TextColor foreground, TextColor background = default, TextDecoration decoration = TextDecoration.None, string? hyperlink = null)
-        : this(foreground.Rgb, background.Rgb, decoration, hyperlink) {
+        : this(foreground.Value, background.Value, decoration, hyperlink) {
 
     }
-    public TextColor ForegroundColor => Foreground < 0 ? default : TextColor.FromRgb(Foreground);
-    public TextColor BackgroundColor => Background < 0 ? default : TextColor.FromRgb(Background);
-    public TextStyle WithForeground(TextColor color) => this with { Foreground = color.Rgb };
-    public TextStyle WithBackground(TextColor color) => this with { Background = color.Rgb };
+    public TextColor ForegroundColor => TextColor.FromValue(Foreground);
+    public TextColor BackgroundColor => TextColor.FromValue(Background);
+    public TextStyle WithForeground(TextColor color) => this with { Foreground = color.Value };
+    public TextStyle WithBackground(TextColor color) => this with { Background = color.Value };
     public TextStyle WithDecoration(TextDecoration decoration) => this with { Decoration = decoration };
     public TextStyle WithHyperlink(string? uri) {
         if (uri is not null) {

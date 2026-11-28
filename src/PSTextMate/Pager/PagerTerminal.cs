@@ -112,7 +112,16 @@ internal static class TerminalPager {
             }
         }
         finally {
-            terminal.End();
+            try {
+                // Kitty images are a layer above the text: remove ours before leaving the alternate screen.
+                if (frame.HasKittyPlacements) {
+                    terminal.Write(VT.DeleteKittyPlacements);
+                    terminal.Flush();
+                }
+            }
+            finally {
+                terminal.End();
+            }
         }
     }
 }

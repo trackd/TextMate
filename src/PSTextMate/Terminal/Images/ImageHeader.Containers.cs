@@ -1,6 +1,6 @@
 using System.Buffers.Binary;
 
-namespace PSTextMate.Images;
+namespace PSTextMate.Core;
 
 internal static partial class ImageHeader {
     private static bool ReadRiff(Stream stream, long start, ReadOnlySpan<byte> header,

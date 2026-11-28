@@ -4,7 +4,7 @@ BeforeAll {
     }
 }
 
-Describe 'Format-PowerShell' {
+Describe 'Format-PowerShell' -Tag 'Adapter' {
     It 'Formats a simple PowerShell string and returns renderables' {
         $ps = 'function Test-Thing { Write-Output "hi" }'
         $out = $ps | Format-PowerShell -OutputFormat Spectre

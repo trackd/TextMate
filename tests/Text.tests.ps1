@@ -11,18 +11,6 @@ Describe 'TextMate output' {
         $check = {
             param($moduleFile, $imageFile)
             $ErrorActionPreference = 'Stop'
-            Add-Type @'
-namespace Sixel.Terminal {
-    public sealed class CellSize {
-        public int PixelWidth { get; } = 11;
-        public int PixelHeight { get; } = 23;
-    }
-    public static class Compatibility {
-        public static bool TerminalSupportsSixel() => true;
-        public static CellSize GetCellSize() => new CellSize();
-    }
-}
-'@
             $global:ImageRequests = [Collections.Generic.List[object]]::new()
             New-Module -Name Sixel -ScriptBlock {
                 function ConvertTo-Sixel {
@@ -43,6 +31,7 @@ namespace Sixel.Terminal {
                 Export-ModuleMember -Function ConvertTo-Sixel
             } | Import-Module -Global
             Import-Module $moduleFile
+            [PSTextMate.Core.TerminalCapabilities]::Set([PSTextMate.Core.TerminalCapabilities]::new('test', $true, $false, $false, $false, 11, 23, $true))
             $source = "# Heading`n`nA paragraph.`n`n![image]($imageFile)"
             $lexical = [PSTextMate.Core.SyntaxHighlighter]::Highlight($source, 'markdown')
             foreach ($rows in @(12, 20)) {
@@ -74,18 +63,6 @@ namespace Sixel.Terminal {
         $check = {
             param($moduleFile, $imageFile)
             $ErrorActionPreference = 'Stop'
-            Add-Type @'
-namespace Sixel.Terminal {
-    public sealed class CellSize {
-        public int PixelWidth { get; } = 2;
-        public int PixelHeight { get; } = 4;
-    }
-    public static class Compatibility {
-        public static bool TerminalSupportsSixel() => true;
-        public static CellSize GetCellSize() => new CellSize();
-    }
-}
-'@
             $global:TextMateImageReads = [Collections.Generic.List[int]]::new()
             New-Module -Name Sixel -ScriptBlock {
                 function ConvertTo-Sixel {
@@ -101,10 +78,11 @@ namespace Sixel.Terminal {
                 Export-ModuleMember -Function ConvertTo-Sixel
             } | Import-Module -Global
             Import-Module $moduleFile
+            [PSTextMate.Core.TerminalCapabilities]::Set([PSTextMate.Core.TerminalCapabilities]::new('test', $true, $false, $false, $false, 2, 4, $true))
             $document = "![image]($imageFile)" | Format-Markdown -Width 40
             [pscustomobject]@{
                 Count = $document.Images.Length
-                Payload = $document.Images.ToArray()[0].Image.Sixel.ToString()
+                Payload = $document.Images.ToArray()[0].Image.Payload.ToString()
                 Bounds = $document.GetImageBounds(0)
                 Reads = $global:TextMateImageReads.ToArray()
             } | ConvertTo-Json -Depth 4 -Compress
@@ -120,6 +98,42 @@ namespace Sixel.Terminal {
         $result.Bounds.Row | Should -Be 1
         $result.Bounds.Width | Should -Be 3
         $result.Bounds.Height | Should -Be 2
+    }
+
+    It 'Draws <Name> images the terminal decodes itself without the Sixel module' -TestCases @(
+        @{ Name = 'Kitty PNG'; Kitty = $true; Inline = $false; Hex = '89504e470d0a1a0a0000000d49484452000000c800000064080600000000000000'; Protocol = 'Kitty'; Prefix = "`e_Ga=T,f=100,t=d,q=2,C=1,c=20,r=5," }
+        @{ Name = 'iTerm2 GIF'; Kitty = $false; Inline = $true; Hex = '474946383961c80064000000'; Protocol = 'InlineImage'; Prefix = "`e]1337;File=inline=1;size=12;width=20;height=5;" }
+    ) {
+        $imageFile = Join-Path $TestDrive 'picture.bin'
+        [IO.File]::WriteAllBytes($imageFile, [Convert]::FromHexString($Hex))
+        $check = {
+            param($moduleFile, $imageFile, $kitty, $inline)
+            $ErrorActionPreference = 'Stop'
+            # A Sixel module that fails loudly proves the built-in path never needs it.
+            New-Module -Name Sixel -ScriptBlock {
+                function ConvertTo-Sixel { throw 'The Sixel module was used.' }
+                Export-ModuleMember -Function ConvertTo-Sixel
+            } | Import-Module -Global
+            Import-Module $moduleFile
+            [PSTextMate.Core.TerminalCapabilities]::Set([PSTextMate.Core.TerminalCapabilities]::new('test', $false, $kitty, $inline, $false, 10, 20, $true))
+            $document = "![picture]($imageFile)" | Format-Markdown -Width 20
+            $image = $document.Images.ToArray()[0].Image
+            [pscustomobject]@{
+                Count = $document.Images.Length
+                Protocol = "$($image.Protocol)"
+                Payload = $image.Payload.ToString()
+                Bounds = $document.GetImageBounds(0)
+            } | ConvertTo-Json -Depth 4 -Compress
+        }
+        $moduleFile = Join-Path $PSScriptRoot '../output/TextMate.psd1'
+        $result = (& (Join-Path $PSHOME ($IsWindows ? 'pwsh.exe' : 'pwsh')) -NoProfile -NonInteractive -Command $check -args $moduleFile, $imageFile, $Kitty, $Inline) | ConvertFrom-Json
+        $LASTEXITCODE | Should -Be 0
+        $result.Count | Should -Be 1
+        $result.Protocol | Should -BeExactly $Protocol
+        $result.Payload.StartsWith($Prefix) | Should -BeTrue
+        # 200x100 pixels in 10x20 cells, fitted to 20 columns: 20x5 cells keeps the aspect ratio.
+        $result.Bounds.Width | Should -Be 20
+        $result.Bounds.Height | Should -Be 5
     }
 
     It 'Streams lexical output directly to console spans without returning a formatted string' {

@@ -6,6 +6,8 @@ namespace PSTextMate.Commands;
 public abstract class TextMateCmdletBase : PSCmdlet, IDisposable {
     private readonly List<string> _inputBuffer = [];
     private readonly CancellationTokenSource _cancellation = new();
+    private bool _pageWarningWritten;
+    private int _disposed;
 
     [Parameter(Mandatory = true, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true, Position = 0)]
     [AllowEmptyString]
@@ -40,6 +42,9 @@ public abstract class TextMateCmdletBase : PSCmdlet, IDisposable {
     protected virtual string? DefaultLanguage => null;
     protected string? SourceExtensionHint { get; private set; }
     protected string? SourceBaseDirectory { get; private set; }
+
+    // The first eligible command probes the terminal once; rendering only reads the cached capabilities.
+    protected override void BeginProcessing() => TerminalCapabilities.Prepare(this);
 
     protected override void ProcessRecord() {
         if (InputObject?.BaseObject is null)
@@ -77,16 +82,30 @@ public abstract class TextMateCmdletBase : PSCmdlet, IDisposable {
         }
     }
 
-    protected override void StopProcessing() => _cancellation.Cancel();
+    protected override void StopProcessing() {
+        try {
+            _cancellation.Cancel();
+        }
+        catch (ObjectDisposedException) {
+            // StopProcessing can race with EndProcessing's final cleanup.
+        }
+    }
 
     public void Dispose() {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
         _cancellation.Dispose();
         GC.SuppressFinalize(this);
     }
 
     private void ProcessFile(FileInfo file) {
-        if (!file.Exists)
-            throw new FileNotFoundException($"File not found: {file.FullName}", file.FullName);
+        if (!file.Exists) {
+            if (Directory.Exists(file.FullName))
+                throw new ArgumentException($"'{file.FullName}' is a directory. Pass a file, or pipe Get-ChildItem -File output.");
+            string hint = MyInvocation.ExpectingInput ? string.Empty
+                : $" To highlight text rather than a file, pipe it: '...' | {MyInvocation.MyCommand.Name}";
+            throw new FileNotFoundException($"File not found: {file.FullName}.{hint}", file.FullName);
+        }
         SourceBaseDirectory = file.DirectoryName;
         SourceExtensionHint = file.Extension;
         (string token, bool extension) = ResolveTokenForPathInput(file);
@@ -98,8 +117,17 @@ public abstract class TextMateCmdletBase : PSCmdlet, IDisposable {
             LineNumbers.IsPresent, _cancellation.Token);
         if (document.LimitExceededCount != 0)
             WriteWarning($"Highlighting reached the regex work limit {document.LimitExceededCount} times; some styles may be incomplete.");
+        // Text and native outputs are laid out again at the width available when they are displayed.
         var options = new RendererOptions(UseAlternate, SourceBaseDirectory, ResolveWidth(), ConstrainWidth: Width > 0);
+        // HTML is not a terminal: without -Width, code keeps its source lines; Markdown still needs a layout width.
+        if (OutputFormat == OutputFormat.Html && Width <= 0 && document.Language != "markdown")
+            options = options with { Width = int.MaxValue / 2 };
         if (Page.IsPresent) {
+            // Text and native formats display the same in the pager; HTML is the one format -Page cannot honor.
+            if (OutputFormat == OutputFormat.Html && !_pageWarningWritten) {
+                _pageWarningWritten = true;
+                WriteWarning($"-Page shows the document in the built-in pager; -OutputFormat {OutputFormat} is ignored.");
+            }
             TextPager.Show(document, options, _cancellation.Token);
         }
         else {

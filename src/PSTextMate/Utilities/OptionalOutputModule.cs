@@ -5,21 +5,15 @@ namespace PSTextMate.Utilities;
 
 /// <summary>Loads an installed consumer only when its native output is explicitly requested.</summary>
 internal static class OptionalOutputModule {
+    private static (string Framework, string Module)? Consumer(OutputFormat format) => format switch {
+        OutputFormat.Spectre => ("Spectre.Console", "PwshSpectreConsole"),
+        OutputFormat.Fullscreen => ("XenoAtom.Terminal.UI", "fullscreen"),
+        _ => null
+    };
+
     internal static void Ensure(OutputFormat format) {
-        string framework;
-        string module;
-        switch (format) {
-            case OutputFormat.Spectre:
-                framework = "Spectre.Console";
-                module = "PwshSpectreConsole";
-                break;
-            case OutputFormat.Fullscreen:
-                framework = "XenoAtom.Terminal.UI";
-                module = "fullscreen";
-                break;
-            default:
-                return;
-        }
+        if (Consumer(format) is not (string framework, string module))
+            return;
         if (Runspace.DefaultRunspace is null)
             return;
         using var pipeline = PowerShell.Create(RunspaceMode.CurrentRunspace);
