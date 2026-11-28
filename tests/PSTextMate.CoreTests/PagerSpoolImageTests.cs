@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using PSTextMate.Core;
 using Xunit;
 
@@ -56,16 +57,27 @@ public sealed class PagerSpoolImageTests {
         Assert.Equal(0, spool.CachedImageBytes);
         spool.Append(Create("small"));
         TerminalImage cached = spool.ReadImage(1);
+        for (int index = 0; index < 32; index++)
+            Assert.True(ReadCachedBatch(spool, cached));
         long before = GC.GetAllocatedBytesForCurrentThread();
-        for (int index = 0; index < 1000; index++) {
-            Assert.Same(cached, spool.ReadImage(1));
-            spool.GetImageBounds(1);
-        }
-        Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - before);
+        bool same = ReadCachedBatch(spool, cached);
+        long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        Assert.True(same);
+        Assert.Equal(0, allocated);
         Assert.Equal(10, spool.CachedImageBytes);
         spool.Dispose();
         Assert.False(File.Exists(path));
         Assert.Throws<ObjectDisposedException>(() => spool.ReadImage(0));
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static bool ReadCachedBatch(PagerSpool spool, TerminalImage cached) {
+        bool same = true;
+        for (int index = 0; index < 1000; index++) {
+            same &= ReferenceEquals(cached, spool.ReadImage(1));
+            spool.GetImageBounds(1);
+        }
+        return same;
     }
 
     [Fact]
