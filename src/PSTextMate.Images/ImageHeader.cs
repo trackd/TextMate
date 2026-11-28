@@ -5,7 +5,10 @@ namespace PSTextMate.Images;
 internal readonly record struct ImageDimensions(int Width, int Height);
 
 /// <summary>Reads dimensions from container headers without decompressing pixels or loading a codec.</summary>
-internal static class ImageHeader {
+internal static partial class ImageHeader {
+    private const int MaximumHeaderBytes = 1_048_576;
+    private const int MaximumEntries = 4096;
+
     internal static bool TryRead(Stream stream, out ImageDimensions dimensions) {
         dimensions = default;
         if (!stream.CanRead || !stream.CanSeek)
@@ -32,7 +35,7 @@ internal static class ImageHeader {
                     width = BinaryPrimitives.ReadUInt16LittleEndian(data[18..]);
                     height = BinaryPrimitives.ReadUInt16LittleEndian(data[20..]);
                 }
-                else if (dib >= 40) {
+                else if (dib == 16 || dib >= 40) {
                     width = BinaryPrimitives.ReadInt32LittleEndian(data[18..]);
                     int rawHeight = BinaryPrimitives.ReadInt32LittleEndian(data[22..]);
                     height = rawHeight == int.MinValue ? 0 : Math.Abs(rawHeight);
@@ -41,6 +44,10 @@ internal static class ImageHeader {
             else if (length >= 2 && data[0] == 0xff && data[1] == 0xd8) {
                 stream.Position = original + 2;
                 return ReadJpeg(stream, original, out dimensions);
+            }
+            else {
+                long limit = original + Math.Min(stream.Length - original, MaximumHeaderBytes);
+                return ReadAdditionalFormat(stream, original, limit, data, out dimensions);
             }
             if (width <= 0 || height <= 0)
                 return false;
@@ -54,7 +61,7 @@ internal static class ImageHeader {
 
     private static bool ReadJpeg(Stream stream, long start, out ImageDimensions dimensions) {
         dimensions = default;
-        long limit = Math.Min(stream.Length, start + 1_048_576);
+        long limit = start + Math.Min(stream.Length - start, MaximumHeaderBytes);
         Span<byte> segment = stackalloc byte[7];
         for (int markerCount = 0; markerCount < 256 && stream.Position < limit; markerCount++) {
             if (stream.ReadByte() != 0xff)
